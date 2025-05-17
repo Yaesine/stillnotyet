@@ -1,0 +1,2 @@
+/Users/yassinecheqrouni/Desktop/stillnotyet-main/android/app/.cxx/RelWithDebInfo/2w2w1w6q/armeabi-v7a/CMakeFiles/edit_cache.dir
+/Users/yassinecheqrouni/Desktop/stillnotyet-main/android/app/.cxx/RelWithDebInfo/2w2w1w6q/armeabi-v7a/CMakeFiles/rebuild_cache.dir

@@ -1,0 +1,6 @@
+-keep class androidx.window.** { *; }
+-dontwarn androidx.window.**
+-keep class android.window.** { *; }
+-dontwarn android.window.**
+-keep class android.location.Geocoder$GeocodeListener { *; }
+-dontwarn android.location.Geocoder$GeocodeListener
