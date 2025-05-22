@@ -1,4 +1,5 @@
 // lib/services/firestore_service.dart - Updated with history preservation
+//update new features to be private
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../models/user_model.dart';
