@@ -1,0 +1,50 @@
+name: new_tinder_clone
+description: A Flutter Tinder clone application.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_native_splash: ^2.3.6
+  provider: ^6.0.5
+  shared_preferences: ^2.2.1
+  intl: ^0.18.1
+  cached_network_image: ^3.2.3
+
+  # Firebase packages with compatible versions
+  firebase_core: ^2.15.1
+  firebase_auth: ^4.9.0
+  cloud_firestore: ^4.8.5  # Updated from 4.7.0 to fix the databaseURL issue
+  firebase_messaging: ^14.6.7
+  cloud_functions: ^4.4.0
+
+  # Other dependencies from your original file
+  image_picker: ^0.8.9
+  uuid: ^3.0.7
+  google_fonts: ^5.1.0
+  confetti: ^0.7.0
+  shimmer: ^3.0.0
+  #flutter_facebook_auth: ^6.0.3 // i remove fb login
+  http: ^1.1.0
+  timeago: ^3.5.0
+  country_code_picker: ^3.0.0
+  cloudinary_public: ^0.21.0
+  # google_sign_in: ^6.1.4  # WE DO NOT NEED I, WE ARE USING GOOGLE SIGN IN DIRECTLY IN CODE
+
+flutter_native_splash:
+  color: "#000000"
+  image: assets/logo.png
+  android: true
+  ios: true
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true

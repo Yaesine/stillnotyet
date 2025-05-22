@@ -1,0 +1,2 @@
+/Users/yassinecheqrouni/Downloads/stillnotyet-p/android/app/.cxx/RelWithDebInfo/4u2u6622/arm64-v8a/CMakeFiles/edit_cache.dir
+/Users/yassinecheqrouni/Downloads/stillnotyet-p/android/app/.cxx/RelWithDebInfo/4u2u6622/arm64-v8a/CMakeFiles/rebuild_cache.dir
