@@ -1,11 +1,13 @@
-// lib/providers/app_auth_provider.dart - Temporary bypass solution
-import 'dart:async';
+// lib/providers/app_auth_provider.dart - Updated with Apple Sign In
 
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../services/firestore_service.dart';
 import '../services/notifications_service.dart';
 
@@ -16,7 +18,7 @@ class AppAuthProvider with ChangeNotifier {
   User? _user;
   String? _errorMessage;
   bool _isLoading = true;
-  bool _isInitialized = false;  // Add this flag
+  bool _isInitialized = false;
 
   // Getters
   User? get user => _auth.currentUser;
@@ -24,34 +26,7 @@ class AppAuthProvider with ChangeNotifier {
   String get currentUserId => _auth.currentUser?.uid ?? '';
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
-  bool get isInitialized => _isInitialized;  // Add this getter
-
-
-  Future<void> initializeAuth() async {
-    if (_isInitialized) return;
-
-    // Mark as initialized immediately to avoid blocking
-    _isInitialized = true;
-    _isLoading = false;
-    notifyListeners();
-
-    try {
-      // Continue initialization in background
-      _continueAuthInitialization();
-    } catch (e) {
-      print('Initial auth check error: $e');
-    }
-  }
-  Future<void> _continueAuthInitialization() async {
-    try {
-      // Check if user is already logged in
-      _user = _auth.currentUser;
-
-      // Rest of your initialization code...
-    } catch (e) {
-      print('Background auth initialization error: $e');
-    }
-  }
+  bool get isInitialized => _isInitialized;
 
   AppAuthProvider() {
     _user = _auth.currentUser;
@@ -66,6 +41,28 @@ class AppAuthProvider with ChangeNotifier {
       _user = user;
       notifyListeners();
     });
+  }
+
+  Future<void> initializeAuth() async {
+    if (_isInitialized) return;
+
+    _isInitialized = true;
+    _isLoading = false;
+    notifyListeners();
+
+    try {
+      _continueAuthInitialization();
+    } catch (e) {
+      print('Initial auth check error: $e');
+    }
+  }
+
+  Future<void> _continueAuthInitialization() async {
+    try {
+      _user = _auth.currentUser;
+    } catch (e) {
+      print('Background auth initialization error: $e');
+    }
   }
 
   // Login with email and password
@@ -109,22 +106,17 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // TOTAL BYPASS: Register new user without touching problematic APIs
-  // Modified register method for AppAuthProvider.dart
-// Replace the existing register method with this improved version
-
+  // Register new user
   Future<bool> register(String name, String email, String password) async {
     try {
       _errorMessage = null;
       _isLoading = true;
       notifyListeners();
 
-      // Ensure email is properly formatted (lowercase)
       final formattedEmail = email.trim().toLowerCase();
 
       print('Starting registration for $formattedEmail...');
 
-      // STEP 1: Create Firebase Auth account WITHOUT updating profile
       final tempResult = await _auth.createUserWithEmailAndPassword(
         email: formattedEmail,
         password: password,
@@ -142,20 +134,16 @@ class AppAuthProvider with ChangeNotifier {
       final userId = tempUser.uid;
       print('Firebase Auth account created with ID: $userId');
 
-      // STEP 2: Sign out to prevent PigeonUserDetails error
       await _auth.signOut();
       print('Temporary signout to avoid PigeonUserDetails error');
 
-      // STEP 3: Create the Firestore profile with more info
       try {
         await _firestoreService.createNewUser(userId, name, formattedEmail);
         print('Firestore profile created for user: $name ($formattedEmail)');
       } catch (e) {
         print('Error creating Firestore profile: $e');
-        // Continue anyway - we'll try to sign back in
       }
 
-      // STEP 4: Sign back in with the created credentials
       try {
         final signInResult = await _auth.signInWithEmailAndPassword(
           email: formattedEmail,
@@ -177,26 +165,21 @@ class AppAuthProvider with ChangeNotifier {
         _errorMessage = 'Account created but login failed. Please try logging in manually.';
         _isLoading = false;
         notifyListeners();
-        // Even though sign-in failed, the account was created successfully
         return true;
       }
 
-      // STEP 5: Save FCM token and other necessary information
       try {
         await _notificationsService.saveTokenToDatabase(userId);
         print('FCM token saved');
       } catch (e) {
         print('Non-critical error saving FCM token: $e');
-        // Continue anyway
       }
 
-      // STEP 6: Save to SharedPreferences
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', userId);
       } catch (e) {
         print('Error saving to SharedPreferences: $e');
-        // Continue anyway
       }
 
       print('Registration completed successfully with bypass method');
@@ -219,21 +202,16 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-  // Google Sign In
   // Google Sign In using Firebase Auth directly
-  // Replace your current signInWithGoogle() method in app_auth_provider.dart with this implementation
   Future<bool> signInWithGoogle() async {
     try {
       print('Starting Google Sign In with Firebase Auth...');
 
-      // Create a Google auth provider
       GoogleAuthProvider googleProvider = GoogleAuthProvider();
 
-      // Add scopes
       googleProvider.addScope('email');
       googleProvider.addScope('profile');
 
-      // Use signInWithProvider instead of signInWithPopup for iOS
       final userCredential = await _auth.signInWithProvider(googleProvider);
       final user = userCredential.user;
 
@@ -264,24 +242,122 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-
-
-  // Apple Sign In (placeholder)
+  // APPLE SIGN IN IMPLEMENTATION
   Future<bool> signInWithApple() async {
     try {
-      print('Apple sign in initiated');
-      _errorMessage = "Apple Sign In is not yet fully implemented";
+      print('Starting Apple Sign In...');
+
+      // To prevent replay attacks with Firebase, we will generate a nonce
+      // and include it in the request
+      final rawNonce = generateNonce();
+      final nonce = sha256ofString(rawNonce);
+
+      // Request credential for the currently signed in Apple account
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce,
+      );
+
+      print('Apple Sign In credential received');
+
+      // Create an OAuth credential from the credential returned by Apple
+      final oauthCredential = OAuthProvider("apple.com").credential(
+        idToken: appleCredential.identityToken,
+        rawNonce: rawNonce,
+      );
+
+      // Sign in the user with Firebase. If the nonce we generated earlier does
+      // not match the nonce in the credential, sign in will fail.
+      final authResult = await _auth.signInWithCredential(oauthCredential);
+
+      final user = authResult.user;
+
+      if (user != null) {
+        print('Apple Sign In successful: ${user.uid}');
+
+        // Get the display name from Apple credential if available
+        String displayName = user.displayName ?? '';
+
+        // If no display name from Firebase, try to construct from Apple credential
+        if (displayName.isEmpty && appleCredential.givenName != null) {
+          displayName = '${appleCredential.givenName ?? ''} ${appleCredential.familyName ?? ''}'.trim();
+        }
+
+        // If still no name, use a default
+        if (displayName.isEmpty) {
+          displayName = 'Apple User';
+        }
+
+        // Create or update user in Firestore
+        await _firestoreService.createNewUser(
+            user.uid,
+            displayName,
+            user.email ?? appleCredential.email ?? ''
+        );
+
+        // Save FCM token
+        await _notificationsService.saveTokenToDatabase(user.uid);
+
+        // Save to SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userId', user.uid);
+
+        notifyListeners();
+        return true;
+      }
+
+      return false;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      print('Apple Sign In authorization error: ${e.code} - ${e.message}');
+
+      switch (e.code) {
+        case AuthorizationErrorCode.canceled:
+          _errorMessage = 'Sign in was cancelled';
+          break;
+        case AuthorizationErrorCode.failed:
+          _errorMessage = 'Sign in failed. Please try again.';
+          break;
+        case AuthorizationErrorCode.invalidResponse:
+          _errorMessage = 'Invalid response from Apple. Please try again.';
+          break;
+        case AuthorizationErrorCode.notHandled:
+          _errorMessage = 'Sign in not handled. Please try again.';
+          break;
+        case AuthorizationErrorCode.unknown:
+          _errorMessage = 'An unknown error occurred. Please try again.';
+          break;
+        default:
+          _errorMessage = 'Apple sign in failed. Please try again.';
+      }
+
       notifyListeners();
       return false;
     } catch (e) {
-      print('Apple sign in error: $e');
-      _errorMessage = e.toString();
+      print('Apple Sign In error: $e');
+      _errorMessage = 'Apple sign in failed: ${e.toString()}';
       notifyListeners();
       return false;
     }
   }
 
-  // Phone Auth
+  // Generates a cryptographically secure random nonce
+  String generateNonce([int length = 32]) {
+    const charset = '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+    final random = Random.secure();
+    return List.generate(length, (_) => charset[random.nextInt(charset.length)]).join();
+  }
+
+  // Returns the sha256 hash of [input] in hex notation
+  String sha256ofString(String input) {
+    final bytes = utf8.encode(input);
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
+  // Phone Auth methods remain the same
   Future<String?> sendOtp(String phoneNumber, {bool useWhatsApp = false}) async {
     try {
       _errorMessage = null;
@@ -419,14 +495,11 @@ class AppAuthProvider with ChangeNotifier {
   }
 
   // Logout
-  // Logout
   Future<void> logout() async {
     try {
       print('Attempting logout');
 
       await _auth.signOut();
-      // Remove this line since google_sign_in is no longer used:
-      // await GoogleSignIn().signOut();
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('userId');

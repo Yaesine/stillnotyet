@@ -22,6 +22,10 @@ dependencies:
   firebase_messaging: ^14.6.7
   cloud_functions: ^4.4.0
 
+  # Authentication dependencies
+  sign_in_with_apple: ^5.0.0
+  crypto: ^3.0.3
+
   # Other dependencies from your original file
   image_picker: ^0.8.9
   uuid: ^3.0.7

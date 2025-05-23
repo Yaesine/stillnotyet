@@ -108,13 +108,41 @@ class _ModernLoginScreenState extends State<ModernLoginScreen> with SingleTicker
       final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
       bool success = await authProvider.signInWithApple();
 
+      print('Apple sign in result: $success');
+
       if (success && mounted) {
-        Navigator.of(context).pushReplacementNamed('/main');
-      } else {
-        _showErrorDialog('Apple sign in failed. Please try again.');
+        print('Navigating to main screen...');
+        // Use pushNamedAndRemoveUntil to ensure clean navigation
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/main',
+              (route) => false,
+        );
+      } else if (!success && mounted) {
+        // Check if user is actually logged in despite the return value
+        if (authProvider.isLoggedIn) {
+          print('User is logged in, navigating to main...');
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            '/main',
+                (route) => false,
+          );
+        } else {
+          _showErrorDialog('Apple sign in failed. Please try again.');
+        }
       }
     } catch (error) {
-      _showErrorDialog('Failed to sign in with Apple: ${error.toString()}');
+      print('Login screen error: $error');
+
+      // Even if there's an error, check if user is authenticated
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+      if (authProvider.isLoggedIn && mounted) {
+        print('User is authenticated despite error, navigating to main...');
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/main',
+              (route) => false,
+        );
+      } else if (mounted) {
+        _showErrorDialog('Failed to sign in with Apple: ${error.toString()}');
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -123,7 +151,6 @@ class _ModernLoginScreenState extends State<ModernLoginScreen> with SingleTicker
       }
     }
   }
-
   void _showErrorDialog(String message) {
     if (!mounted) return;
 
