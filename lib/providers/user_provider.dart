@@ -399,7 +399,13 @@ class UserProvider with ChangeNotifier {
 
   // Start visitors and likes streams
 // Modify the startVisitorsAndLikesStreams method in lib/providers/user_provider.dart
+  void removeProfileLocally(String userId) {
+    // Remove the profile from the potential matches list
+    _potentialMatches.removeWhere((user) => user.id == userId);
 
+    // Notify listeners to update the UI immediately
+    notifyListeners();
+  }
 // Update this method in UserProvider class
   void startVisitorsAndLikesStreams() {
     // Listen for profile visitors (recent)

@@ -1,5 +1,5 @@
 // Modified version of lib/widgets/enhanced_swipe_card.dart
-// with improved profile viewing functionality
+// with improved profile viewing functionality and swipe up super like
 
 import 'package:flutter/material.dart';
 import 'dart:math';
@@ -37,17 +37,22 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
   int _currentImageIndex = 0;
   bool _showInfo = false;
 
+  // Add vertical drag tracking
+  double _verticalDragOffset = 0;
+  bool _isVerticalDrag = false;
+
   // Animation controller for bounce back
   late AnimationController _animationController;
   late Animation<double> _rotationAnimation;
   late Animation<double> _slideAnimation;
+  late Animation<double> _verticalSlideAnimation;
 
   @override
   void initState() {
     super.initState();
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 50), // Extremely short duration
     );
 
     _rotationAnimation = Tween<double>(begin: 0, end: 0).animate(
@@ -58,10 +63,16 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
     );
 
+    // Add vertical slide animation
+    _verticalSlideAnimation = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
+    );
+
     _animationController.addListener(() {
       setState(() {
         _dragOffset = _slideAnimation.value;
         _dragAngle = _rotationAnimation.value;
+        _verticalDragOffset = _verticalSlideAnimation.value;
       });
     });
   }
@@ -75,13 +86,25 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
   @override
   Widget build(BuildContext context) {
     // Calculate opacity based on drag offset (fades when dragging away)
-    final opacity = widget.isTop
-        ? max(0.5, min(1.0, 1.0 - _dragOffset.abs() / 500))
+    final opacity = widget.isTop && (_dragOffset.abs() > 20 || _verticalDragOffset.abs() > 20)
+        ? max(0.5, min(1.0, 1.0 - max(_dragOffset.abs(), _verticalDragOffset.abs()) / 500))
         : 1.0;
 
     return GestureDetector(
+      // Handle horizontal drag
+      onHorizontalDragStart: widget.isTop ? (_) {
+        _isVerticalDrag = false;
+      } : null,
       onHorizontalDragUpdate: widget.isTop ? _handleDragUpdate : null,
       onHorizontalDragEnd: widget.isTop ? _handleDragEnd : null,
+
+      // Handle vertical drag - NEW
+      onVerticalDragStart: widget.isTop ? (_) {
+        _isVerticalDrag = true;
+      } : null,
+      onVerticalDragUpdate: widget.isTop ? _handleVerticalDragUpdate : null,
+      onVerticalDragEnd: widget.isTop ? _handleVerticalDragEnd : null,
+
       onTap: () {
         if (widget.isTop) {
           setState(() {
@@ -100,11 +123,15 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
       child: Opacity(
         opacity: opacity,
         child: Transform.translate(
-          offset: Offset(widget.isTop ? _dragOffset : 0, 0),
+          // Apply both horizontal and vertical transformations only when actively dragging
+          offset: Offset(
+              widget.isTop && _dragOffset.abs() > 0 ? _dragOffset : 0,
+              widget.isTop && _verticalDragOffset < 0 ? _verticalDragOffset : 0
+          ),
           child: Transform.rotate(
-            angle: widget.isTop ? (_dragOffset / 1000) : 0,
+            angle: widget.isTop && _dragOffset.abs() > 0 ? (_dragOffset / 1000) : 0,
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 100), // Reduced from 300ms to 100ms
               margin: const EdgeInsets.fromLTRB(16, 100, 16, 78),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
@@ -165,11 +192,13 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(24),
                             border: Border.all(
-                              color: _dragOffset > 50
-                                  ? Colors.green.withOpacity(0.8)
+                              color: _verticalDragOffset < -50
+                                  ? Colors.blue.withOpacity(0.8) // Super Like color for upward swipe
+                                  : _dragOffset > 50
+                                  ? Colors.green.withOpacity(0.8) // Like color
                                   : _dragOffset < -50
-                                  ? Colors.red.withOpacity(0.8)
-                                  : Colors.white.withOpacity(0.2),
+                                  ? Colors.red.withOpacity(0.8) // Nope color
+                                  : Colors.white.withOpacity(0.2), // Default color
                               width: 2,
                             ),
                           ),
@@ -203,46 +232,8 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
                       ),
 
                     // Swipe indicators
-                    if (widget.isTop && _dragOffset.abs() > 20)
-                      Positioned(
-                        top: 24,
-                        left: _dragOffset > 0 ? 24 : null,
-                        right: _dragOffset < 0 ? 24 : null,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            border: Border.all(
-                              color: _dragOffset > 0 ? Colors.green : AppColors.primary,
-                              width: 3,
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            color: (_dragOffset.abs() > 50)
-                                ? (_dragOffset > 0 ? Colors.green.withOpacity(0.2) : AppColors.primary.withOpacity(0.2))
-                                : Colors.transparent,
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                _dragOffset > 0 ? Icons.favorite : Icons.close,
-                                color: _dragOffset > 0 ? Colors.green : AppColors.primary,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                _dragOffset > 0 ? 'LIKE' : 'NOPE',
-                                style: TextStyle(
-                                  color: _dragOffset > 0 ? Colors.green : AppColors.primary,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 20,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                    if (widget.isTop)
+                      _buildSwipeIndicator(),
 
                     // User info with gradient overlay
                     Positioned(
@@ -364,7 +355,7 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
                                     )).toList(),
                                   ),
 
-                                  // NEW: Add a "View Full Profile" button
+                                  // View Full Profile button
                                   if (widget.onViewProfile != null) ...[
                                     const SizedBox(height: 16),
                                     Center(
@@ -482,7 +473,7 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
                         ],
                       ),
 
-                    // NEW: Full profile view "hotspot" icon to make it more obvious
+                    // Full profile view "hotspot" icon
                     if (widget.isTop && widget.onViewProfile != null)
                       Positioned(
                         top: 24,
@@ -513,6 +504,101 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
     );
   }
 
+  // NEW: Method to build swipe indicator based on direction
+  Widget _buildSwipeIndicator() {
+    // Handle horizontal swipe indicators
+    if (_dragOffset.abs() > 20 && !_isVerticalDrag) {
+      return Positioned(
+        top: 24,
+        left: _dragOffset > 0 ? 24 : null,
+        right: _dragOffset < 0 ? 24 : null,
+        child: Container(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 8,
+          ),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: _dragOffset > 0 ? Colors.green : Colors.red,
+              width: 3,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            color: (_dragOffset.abs() > 50)
+                ? (_dragOffset > 0 ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2))
+                : Colors.transparent,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                _dragOffset > 0 ? Icons.favorite : Icons.close,
+                color: _dragOffset > 0 ? Colors.green : Colors.red,
+                size: 20,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                _dragOffset > 0 ? 'LIKE' : 'NOPE',
+                style: TextStyle(
+                  color: _dragOffset > 0 ? Colors.green : Colors.red,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 20,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Handle vertical swipe indicator (Super Like)
+    else if (_verticalDragOffset < -20 && _isVerticalDrag) {
+      return Positioned(
+        top: 24,
+        left: 0,
+        right: 0,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: Colors.blue,
+                width: 3,
+              ),
+              borderRadius: BorderRadius.circular(12),
+              color: _verticalDragOffset < -50
+                  ? Colors.blue.withOpacity(0.2)
+                  : Colors.transparent,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.star,
+                  color: Colors.blue,
+                  size: 20,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'SUPER LIKE',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Return empty container if no drag is happening
+    return const SizedBox.shrink();
+  }
+
   void _handleDragUpdate(DragUpdateDetails details) {
     // Cancel any running animations
     if (_animationController.isAnimating) {
@@ -525,34 +611,37 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
     });
   }
 
+  // NEW: Handle vertical drag updates
+  void _handleVerticalDragUpdate(DragUpdateDetails details) {
+    // Cancel any running animations
+    if (_animationController.isAnimating) {
+      _animationController.stop();
+    }
+
+    setState(() {
+      // Only track upward movement (negative values) for Super Like
+      // We're ignoring downward swipes
+      if (details.delta.dy < 0) {
+        _verticalDragOffset += details.delta.dy;
+      }
+    });
+  }
+
   void _handleDragEnd(DragEndDetails details) {
     final velocity = details.velocity.pixelsPerSecond.dx;
-    final swipeThreshold = MediaQuery.of(context).size.width / 4;
 
-    if (_dragOffset.abs() > swipeThreshold || velocity.abs() > 800) {
-      // Swipe completed - animate card off screen
-      final screenWidth = MediaQuery.of(context).size.width;
-      final endPosition = _dragOffset > 0 ? screenWidth * 1.5 : -screenWidth * 1.5;
+    // Make swipes register even more easily
+    final swipeThreshold = MediaQuery.of(context).size.width / 6; // Reduced from /5 to /6
 
-      _slideAnimation = Tween<double>(
-        begin: _dragOffset,
-        end: endPosition,
-      ).animate(_animationController);
-
-      _rotationAnimation = Tween<double>(
-        begin: _dragAngle,
-        end: _dragOffset > 0 ? pi / 8 : -pi / 8,
-      ).animate(_animationController);
-
-      _animationController.forward().then((_) {
-        if (_dragOffset > 0) {
-          widget.onSwipeRight();
-        } else {
-          widget.onSwipeLeft();
-        }
-      });
+    if (_dragOffset.abs() > swipeThreshold || velocity.abs() > 300) { // Reduced from 500 to 300
+      // Don't even bother with animations - just call the callback immediately
+      if (_dragOffset > 0) {
+        widget.onSwipeRight();
+      } else {
+        widget.onSwipeLeft();
+      }
     } else {
-      // Not enough to trigger swipe - animate back to center
+      // Not enough to trigger swipe - animate back to center very quickly
       _slideAnimation = Tween<double>(
         begin: _dragOffset,
         end: 0,
@@ -564,7 +653,29 @@ class _EnhancedSwipeCardState extends State<EnhancedSwipeCard> with SingleTicker
       ).animate(_animationController);
 
       _animationController.forward().then((_) {
-        // Reset controller for next use
+        _animationController.reset();
+      });
+    }
+  }
+
+  // NEW: Handle vertical drag end
+  void _handleVerticalDragEnd(DragEndDetails details) {
+    final velocity = details.velocity.pixelsPerSecond.dy;
+
+    // Make swipes register even more easily
+    final swipeThreshold = MediaQuery.of(context).size.height / 10; // Reduced further
+
+    if (_verticalDragOffset < -swipeThreshold || velocity < -300) { // Reduced from -500 to -300
+      // Don't even bother with animations - just call the callback immediately
+      widget.onSuperLike();
+    } else {
+      // Not enough to trigger Super Like - animate back to center very quickly
+      _verticalSlideAnimation = Tween<double>(
+        begin: _verticalDragOffset,
+        end: 0,
+      ).animate(_animationController);
+
+      _animationController.forward().then((_) {
         _animationController.reset();
       });
     }

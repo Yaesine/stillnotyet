@@ -1,4 +1,4 @@
-// fixed version of lib/screens/enhanced_home_screen.dart
+// Modified version of lib/screens/enhanced_home_screen.dart with improved super like animation
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
@@ -9,12 +9,11 @@ import '../widgets/components/app_button.dart';
 import '../widgets/enhanced_swipe_card.dart';
 import '../widgets/components/loading_indicator.dart';
 import '../screens/modern_chat_screen.dart';
-import 'nearby_users_screen.dart'; // Importing the whole screen
+import 'nearby_users_screen.dart';
 import 'premium_screen.dart';
 import 'boost_screen.dart';
 import 'streak_screen.dart';
 import '../utils/custom_page_route.dart';
-// Using alias to avoid the conflict
 import '../widgets/user_profile_detail.dart' as widget_profile;
 
 class EnhancedHomeScreen extends StatefulWidget {
@@ -95,126 +94,34 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
     );
   }
 
-  void _handleSwipeLeft(String userId) async {
-    if (_isActionInProgress) return;
-    setState(() => _isActionInProgress = true);
+  void _handleSwipeLeft(String userId) {
+    // Immediately update UI to show next profile
+    Provider.of<UserProvider>(context, listen: false).removeProfileLocally(userId);
 
-    try {
-      await Provider.of<UserProvider>(context, listen: false).swipeLeft(userId);
-
-      // Show subtle feedback
+    // Process the swipe action in the background without waiting
+    Provider.of<UserProvider>(context, listen: false).swipeLeft(userId).catchError((error) {
+      // Only show critical errors
       if (mounted) {
-        ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Passed'),
-            backgroundColor: Colors.grey[800],
+            content: Text('Error: $error'),
+            backgroundColor: Colors.red,
             duration: Duration(milliseconds: 500),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            margin: EdgeInsets.only(bottom: 80, left: 100, right: 100),
           ),
         );
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isActionInProgress = false);
-      }
-    }
+    });
   }
 
-  void _handleSuperLike(String userId) async {
-    if (_isActionInProgress) return;
-    setState(() => _isActionInProgress = true);
+  void _handleSuperLike(String userId) {
+    // Immediately update UI to show next profile
+    Provider.of<UserProvider>(context, listen: false).removeProfileLocally(userId);
 
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final User? matchedUser = await userProvider.superLike(userId);
-
-      // Show a star animation
-      showDialog(
-        context: context,
-        barrierColor: Colors.black.withOpacity(0.5),
-        builder: (ctx) => Center(
-          child: TweenAnimationBuilder(
-            tween: Tween<double>(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 800),
-            builder: (context, value, child) {
-              return Transform.scale(
-                scale: 2.0 * value,
-                child: Opacity(
-                  opacity: value > 0.8 ? 2.0 - value * 2 : value,
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.star,
-                      color: Colors.white,
-                      size: 100,
-                    ),
-                  ),
-                ),
-              );
-            },
-            onEnd: () {
-              Navigator.of(ctx).pop();
-
-              // If it's a match, show match animation
-              if (matchedUser != null && context.mounted) {
-                final currentUser = userProvider.currentUser;
-                if (currentUser != null) {
-                  Navigator.of(context).push(
-                    PageRouteBuilder(
-                      opaque: false,
-                      pageBuilder: (context, animation, secondaryAnimation) {
-                        return ModernMatchAnimation(
-                          currentUser: currentUser,
-                          matchedUser: matchedUser,
-                          onDismiss: () {
-                            Navigator.of(context).pop();
-                          },
-                          onSendMessage: () {
-                            Navigator.of(context).pop();
-                            Navigator.of(context).push(
-                              CustomPageRoute(
-                                child: const ModernChatScreen(),
-                                settings: RouteSettings(arguments: matchedUser),
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
-                  );
-                }
-              }
-            },
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isActionInProgress = false);
-      }
-    }
-  }
-
-  void _handleSwipeRight(String userId) async {
-    if (_isActionInProgress) return;
-    setState(() => _isActionInProgress = true);
-
-    try {
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final User? matchedUser = await userProvider.swipeRight(userId);
-
-      // Show match animation if there's a match
+    // Process the swipe action in the background without waiting
+    Provider.of<UserProvider>(context, listen: false).superLike(userId).then((matchedUser) {
+      // Only show UI for matches
       if (matchedUser != null && mounted) {
-        // Get current user
-        final currentUser = userProvider.currentUser;
-
+        final currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
         if (currentUser != null) {
           // Show match animation
           Navigator.of(context).push(
@@ -241,27 +148,69 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
             ),
           );
         }
-      } else {
-        // Show subtle like feedback
-        if (mounted) {
-          ScaffoldMessenger.of(context).clearSnackBars();
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Liked!'),
-              backgroundColor: AppColors.primary,
-              duration: Duration(milliseconds: 500),
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              margin: EdgeInsets.only(bottom: 80, left: 100, right: 100),
+      }
+    }).catchError((error) {
+      // Only show critical errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $error'),
+            backgroundColor: Colors.red,
+            duration: Duration(milliseconds: 500),
+          ),
+        );
+      }
+    });
+  }
+
+  void _handleSwipeRight(String userId) {
+    // Immediately update UI to show next profile
+    Provider.of<UserProvider>(context, listen: false).removeProfileLocally(userId);
+
+    // Process the swipe action in the background without waiting
+    Provider.of<UserProvider>(context, listen: false).swipeRight(userId).then((matchedUser) {
+      // Only show UI for matches
+      if (matchedUser != null && mounted) {
+        final currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
+        if (currentUser != null) {
+          // Show match animation
+          Navigator.of(context).push(
+            PageRouteBuilder(
+              opaque: false,
+              pageBuilder: (context, animation, secondaryAnimation) {
+                return ModernMatchAnimation(
+                  currentUser: currentUser,
+                  matchedUser: matchedUser,
+                  onDismiss: () {
+                    Navigator.of(context).pop();
+                  },
+                  onSendMessage: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      CustomPageRoute(
+                        child: const ModernChatScreen(),
+                        settings: RouteSettings(arguments: matchedUser),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
           );
         }
       }
-    } finally {
+    }).catchError((error) {
+      // Only show critical errors
       if (mounted) {
-        setState(() => _isActionInProgress = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $error'),
+            backgroundColor: Colors.red,
+            duration: Duration(milliseconds: 500),
+          ),
+        );
       }
-    }
+    });
   }
 
   @override
@@ -297,7 +246,95 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
           },
         ),
       ),
-   //   floatingActionButton: _buildQuickActionFab(),
+    );
+  }
+
+  // NEW: Separate method for swipe controls
+  Widget _buildSwipeControls(String userId) {
+    return Container(
+      padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 10,
+          top: 10,
+          left: 24,
+          right: 24
+      ),
+      decoration: BoxDecoration(
+        color: Theme.of(context).brightness == Brightness.dark
+            ? AppColors.darkSurface
+            : Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Rewind button (could be premium feature)
+          SwipeActionButton(
+            icon: Icons.replay,
+            color: Colors.amber,
+            onTap: () {
+              // Implement rewind functionality (premium feature)
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Upgrade to premium to unlock this feature'),
+                  behavior: SnackBarBehavior.floating,
+                  action: SnackBarAction(
+                    label: 'UPGRADE',
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => PremiumScreen()),
+                      );
+                    },
+                  ),
+                ),
+              );
+            },
+            size: 44,
+          ),
+
+          // Dislike button
+          SwipeActionButton(
+            icon: Icons.close,
+            color: Colors.red,
+            onTap: () => _handleSwipeLeft(userId),
+            size: 64,
+          ),
+
+          // Super like button
+          SwipeActionButton(
+            icon: Icons.star,
+            color: Colors.blue,
+            onTap: () => _handleSuperLike(userId),
+            isSuper: true,
+            size: 54,
+          ),
+
+          // Like button
+          SwipeActionButton(
+            icon: Icons.favorite,
+            color: AppColors.primary,
+            onTap: () => _handleSwipeRight(userId),
+            size: 64,
+          ),
+
+          // Boost button
+          SwipeActionButton(
+            icon: Icons.bolt,
+            color: Colors.purple,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => BoostScreen()),
+              );
+            },
+            size: 44,
+          ),
+        ],
+      ),
     );
   }
 
@@ -481,13 +518,11 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
               onSwipeLeft: () => _handleSwipeLeft(user.id),
               onSwipeRight: () => _handleSwipeRight(user.id),
               onSuperLike: () => _handleSuperLike(user.id),
-              // NEW: Add profile view callback
+              // Add profile view callback
               onViewProfile: () => _showUserProfile(user),
             ),
           );
         }).toList(),
-
-
 
         // Control buttons at the bottom for the top card
         if (profiles.isNotEmpty)
@@ -527,7 +562,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
                   // Dislike button
                   SwipeActionButton(
                     icon: Icons.close,
-                    color: AppColors.error,
+                    color: Colors.red,
                     onTap: () => _handleSwipeLeft(profiles.last.id),
                     size: 64,
                   ),
@@ -565,6 +600,50 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
             ),
           ),
       ],
+    );
+  }
+
+  // NEW: Swipe instruction overlay
+  Widget _buildSwipeInstructions() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 50),
+      child: Column(
+        children: [
+          // Swipe Up instruction
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(50),
+                ),
+                child: Icon(
+                  Icons.keyboard_arrow_up,
+                  color: Colors.blue,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Super Like',
+                  style: TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -659,34 +738,6 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildQuickActionFab() {
-    if (_isLoading) return SizedBox.shrink();
-
-    return Consumer<UserProvider>(
-        builder: (context, userProvider, _) {
-          bool hasActions = userProvider.potentialMatches.isNotEmpty;
-
-          return hasActions
-              ? FloatingActionButton(
-            onPressed: _loadMatches,
-            backgroundColor: Colors.white,
-            foregroundColor: AppColors.primary,
-            elevation: 4,
-            child: Icon(Icons.refresh),
-            tooltip: 'Refresh matches',
-          )
-              : FloatingActionButton.extended(
-            onPressed: _loadMatches,
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 4,
-            icon: Icon(Icons.refresh),
-            label: Text("Find New Matches"),
-          );
-        }
     );
   }
 }
