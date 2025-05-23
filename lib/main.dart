@@ -1,4 +1,4 @@
-// lib/main.dart - Updated with enhanced dark mode
+// lib/main.dart - Updated with Explore tab
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -42,6 +42,7 @@ import 'screens/nearby_users_screen.dart';
 import 'screens/achievements_screen.dart';
 import 'screens/streak_screen.dart';
 import 'screens/profile_verification_screen.dart';
+import 'screens/explore_screen.dart';
 import 'dart:developer' as developer;
 
 // Theme
@@ -204,6 +205,7 @@ class MyApp extends StatelessWidget {
                 '/privacy': (context) => const PrivacySafetyScreen(),
                 '/help': (context) => const HelpSupportScreen(),
                 '/notifications': (context) => const NotificationsScreen(),
+                '/nearby': (context) => const NearbyUsersScreen(),
               },
             ),
           ),
@@ -225,7 +227,8 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   final List<Widget> _screens = [
     const EnhancedHomeScreen(),
-    const LikesScreen(),  // Add the new LikesScreen here
+    const ExploreScreen(),  // Add the new ExploreScreen here
+    const LikesScreen(),
     const MatchesScreen(),
     const TinderStyleProfileScreen(),
   ];
@@ -332,10 +335,10 @@ class _MainScreenState extends State<MainScreen> {
     switch (type) {
       case 'match':
         setState(() {
-          _currentIndex = 2; // Switch to Matches tab
+          _currentIndex = 3; // Switch to Matches tab (index updated)
         });
         _pageController.animateToPage(
-          2,
+          3,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
         );
@@ -343,10 +346,10 @@ class _MainScreenState extends State<MainScreen> {
       case 'super_like':
       case 'profile_view':
         setState(() {
-          _currentIndex = 1; // Switch to Likes tab
+          _currentIndex = 2; // Switch to Likes tab (index updated)
         });
         _pageController.animateToPage(
-          1,
+          2,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeInOut,
         );
@@ -366,10 +369,10 @@ class _MainScreenState extends State<MainScreen> {
         } else {
           // Otherwise just go to matches tab
           setState(() {
-            _currentIndex = 2; // Switch to Matches tab
+            _currentIndex = 3; // Switch to Matches tab (index updated)
           });
           _pageController.animateToPage(
-            2,
+            3,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
           );
@@ -460,6 +463,10 @@ class _MainScreenState extends State<MainScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.whatshot),
               label: 'Discover',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.explore),
+              label: 'Explore',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.favorite),
