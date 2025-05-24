@@ -1,4 +1,5 @@
 // lib/screens/modern_login_screen.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:ui';
@@ -7,6 +8,8 @@ import '../providers/app_auth_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/components/app_button.dart';
 import '../animations/animations.dart';
+import '../services/google_sign_in_native.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ModernLoginScreen extends StatefulWidget {
   const ModernLoginScreen({Key? key}) : super(key: key);
@@ -61,24 +64,32 @@ class _ModernLoginScreenState extends State<ModernLoginScreen> with SingleTicker
     });
 
     try {
-      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-      bool success = await authProvider.signInWithGoogle();
+      print('DEBUG: Starting native sign in');
+      // First, use the native implementation to sign in
+      final userCredential = await GoogleSignInNative.signIn();
 
-      if (success && mounted) {
-        // Navigate to main screen
-        Navigator.of(context).pushReplacementNamed('/main');
-      } else if (!success && mounted) {
-        // Check if the error was the PigeonUserDetails issue but user is actually signed in
-        if (authProvider.isLoggedIn) {
-          // User is actually signed in, navigate to main
+      print('DEBUG: Native sign in completed, userCredential: $userCredential');
+
+      // Check if user is authenticated (even if userCredential is null due to the decoding error)
+      if (FirebaseAuth.instance.currentUser != null && mounted) {
+        print('DEBUG: User is authenticated, calling provider signInWithGoogle');
+        // Now call the provider to handle post-sign-in setup
+        final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+        bool success = await authProvider.signInWithGoogle();
+
+        print('DEBUG: Provider signInWithGoogle returned: $success');
+
+        if (success && mounted) {
+          print('DEBUG: Navigating to main screen');
+          // Navigate to main screen
           Navigator.of(context).pushReplacementNamed('/main');
-        } else {
-          // Show error dialog
-          _showErrorDialog('Google sign in failed. Please try again.');
+        } else if (mounted) {
+          _showErrorDialog('Failed to complete sign in setup');
         }
       }
-    } catch (error) {
+    } catch (error, stackTrace) {
       print('Login screen error: $error');
+      print('Stack trace: $stackTrace');
       if (mounted) {
         _showErrorDialog('Failed to sign in with Google: ${error.toString()}');
       }
@@ -90,8 +101,6 @@ class _ModernLoginScreenState extends State<ModernLoginScreen> with SingleTicker
       }
     }
   }
-
-
 
   Future<void> _handlePhoneSignIn() async {
     if (mounted) {

@@ -205,27 +205,31 @@ class AppAuthProvider with ChangeNotifier {
   // Google Sign In using Firebase Auth directly
   Future<bool> signInWithGoogle() async {
     try {
-      print('Starting Google Sign In with Firebase Auth...');
+      // The actual Google sign-in is handled by the native implementation
+      // This method now just handles the post-sign-in setup
 
-      GoogleAuthProvider googleProvider = GoogleAuthProvider();
-
-      googleProvider.addScope('email');
-      googleProvider.addScope('profile');
-
-      final userCredential = await _auth.signInWithProvider(googleProvider);
-      final user = userCredential.user;
+      // Check if user is already signed in (from native sign-in)
+      final user = _auth.currentUser;
 
       if (user != null) {
-        print('Firebase authentication successful: ${user.uid}');
+        print('Google Sign-In successful, setting up user: ${user.uid}');
 
+        // Create/update user in Firestore
         await _firestoreService.createNewUser(
             user.uid,
             user.displayName ?? 'New User',
             user.email ?? ''
         );
 
-        await _notificationsService.saveTokenToDatabase(user.uid);
+        // Try to save notification token, but don't fail if it doesn't work
+        try {
+          await _notificationsService.saveTokenToDatabase(user.uid);
+        } catch (e) {
+          print('Notification token error (non-blocking): $e');
+          // Continue anyway - notifications aren't critical for sign-in
+        }
 
+        // Save to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', user.uid);
 
@@ -235,13 +239,12 @@ class AppAuthProvider with ChangeNotifier {
 
       return false;
     } catch (e) {
-      print('Google Sign In error: $e');
+      print('Google Sign In setup error: $e');
       _errorMessage = e.toString();
       notifyListeners();
       return false;
     }
   }
-
   // APPLE SIGN IN IMPLEMENTATION
   Future<bool> signInWithApple() async {
     try {

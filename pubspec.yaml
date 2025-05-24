@@ -16,11 +16,14 @@ dependencies:
   cached_network_image: ^3.2.3
 
   # Firebase packages with compatible versions
-  firebase_core: ^2.15.1
-  firebase_auth: ^4.9.0
-  cloud_firestore: ^4.8.5  # Updated from 4.7.0 to fix the databaseURL issue
-  firebase_messaging: ^14.6.7
-  cloud_functions: ^4.4.0
+
+
+  firebase_core: ^2.24.2
+  firebase_auth: ^4.15.0
+  cloud_firestore: ^4.13.0
+  firebase_messaging: ^14.7.0
+  cloud_functions: ^4.5.0
+
 
   # Authentication dependencies
   sign_in_with_apple: ^5.0.0
@@ -37,7 +40,6 @@ dependencies:
   timeago: ^3.5.0
   country_code_picker: ^3.0.0
   cloudinary_public: ^0.21.0
-  # google_sign_in: ^6.1.4  # WE DO NOT NEED I, WE ARE USING GOOGLE SIGN IN DIRECTLY IN CODE
 
 flutter_native_splash:
   color: "#000000"
