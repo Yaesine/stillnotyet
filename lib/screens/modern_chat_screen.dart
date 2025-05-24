@@ -9,6 +9,7 @@ import '../widgets/components/letter_avatar.dart';
 import '../providers/app_auth_provider.dart';
 import '../providers/message_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/user_profile_detail.dart';
 
 class ModernChatScreen extends StatefulWidget {
   const ModernChatScreen({Key? key}) : super(key: key);
@@ -212,14 +213,26 @@ class _ModernChatScreenState extends State<ModernChatScreen> {
         title: _matchedUser != null
             ? Row(
           children: [
-            // Use LetterAvatar instead of CircleAvatar with a network image
-            LetterAvatar(
-              name: _matchedUser!.name,
-              size: 36,
-              imageUrls: _matchedUser!.imageUrls.isEmpty ? null : _matchedUser!.imageUrls,
+            // Make the avatar clickable to navigate to profile
+            GestureDetector(
+              onTap: () {
+                // Navigate to user profile detail
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileDetail(user: _matchedUser!),
+                  ),
+                );
+              },
+              child: LetterAvatar(
+                name: _matchedUser!.name,
+                size: 36,
+                imageUrls: _matchedUser!.imageUrls.isEmpty ? null : _matchedUser!.imageUrls,
+              ),
             ),
             const SizedBox(width: 8),
-            Text("Chat with ${_matchedUser!.name}"),
+            // Display only the first name
+            Text(_matchedUser!.name.split(' ')[0]),
           ],
         )
             : const Text("Chat"),
@@ -293,7 +306,7 @@ class _ModernChatScreenState extends State<ModernChatScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            'You matched with ${_matchedUser!.name}!',
+            'You matched with ${_matchedUser!.name.split(' ')[0]}!',
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
@@ -419,7 +432,7 @@ class _ModernChatScreenState extends State<ModernChatScreen> {
           // Show the current user's avatar on their messages
           if (isMe) ...[
             const SizedBox(width: 8),
-            LetterAvatar(
+            const LetterAvatar(
               name: "Me", // Or get the current user's name
               size: 32,
               backgroundColor: AppColors.primary,
