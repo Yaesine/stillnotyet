@@ -179,6 +179,12 @@ class _ExploreScreenState extends State<ExploreScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    // Add this listener to update UI when tab changes
+    _tabController.addListener(() {
+      if (_tabController.indexIsChanging) {
+        setState(() {});
+      }
+    });
     _loadExploreData();
   }
 
@@ -308,42 +314,111 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Widget _buildTabBar(bool isDarkMode) {
+    // Set colors based on the current theme (matching LikesScreen style)
+    final backgroundColor = isDarkMode ? AppColors.darkCard : Colors.grey.shade200;
+    final selectedBgColor = isDarkMode ? AppColors.primary : AppColors.primary;
+    final unselectedTextColor = isDarkMode ? AppColors.darkTextSecondary : Colors.grey;
+    final selectedTextColor = Colors.white;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+      height: 56, // Main tab bar height
       decoration: BoxDecoration(
-        color: isDarkMode ? AppColors.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-          ),
-        ],
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(28),
       ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(25),
-        ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        labelColor: Colors.white,
-        unselectedLabelColor: isDarkMode
-            ? AppColors.darkTextSecondary
-            : AppColors.textSecondary,
-        labelStyle: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-        ),
-        tabs: const [
-          Tab(text: 'Discover'),
-          Tab(text: 'Categories'),
-          Tab(text: 'Events'),
+      child: Row(
+        children: [
+          // Discover Tab
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                _tabController.animateTo(0);
+              },
+              child: Center(
+                child: Container(
+                  height: 48, // Taller than text but not full container height
+                  width: double.infinity, // Make it fill the width
+                  decoration: BoxDecoration(
+                    color: _tabController.index == 0 ? selectedBgColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Discover',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: _tabController.index == 0 ? selectedTextColor : unselectedTextColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Categories Tab
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                _tabController.animateTo(1);
+              },
+              child: Center(
+                child: Container(
+                  height: 48, // Taller than text but not full container height
+                  width: double.infinity, // Make it fill the width
+                  decoration: BoxDecoration(
+                    color: _tabController.index == 1 ? selectedBgColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Categories',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: _tabController.index == 1 ? selectedTextColor : unselectedTextColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Events Tab
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                _tabController.animateTo(2);
+              },
+              child: Center(
+                child: Container(
+                  height: 48, // Taller than text but not full container height
+                  width: double.infinity, // Make it fill the width
+                  decoration: BoxDecoration(
+                    color: _tabController.index == 2 ? selectedBgColor : Colors.transparent,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Events',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: _tabController.index == 2 ? selectedTextColor : unselectedTextColor,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
-
   Widget _buildDiscoverTab(bool isDarkMode) {
     if (_isLoading) {
       return const Center(

@@ -1,5 +1,7 @@
 // lib/services/firestore_service.dart - Updated with history preservation
 //update new features to be private
+import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../models/user_model.dart';
@@ -109,6 +111,7 @@ class FirestoreService {
   }
 
   // Create new user after registration
+// Create new user after registration
   Future<void> createNewUser(String userId, String name, String email) async {
     try {
       print('Creating user profile for $userId in Firestore');
@@ -120,6 +123,11 @@ class FirestoreService {
         return;
       }
 
+      // Create a default GeoPoint for Dubai area with slight randomization
+      final random = Random();
+      final lat = 25.2048 + (random.nextDouble() * 0.1 - 0.05); // Dubai latitude with variation
+      final lng = 55.2708 + (random.nextDouble() * 0.1 - 0.05); // Dubai longitude with variation
+
       // Create basic user profile WITHOUT a default profile image
       Map<String, dynamic> userData = {
         'id': userId,
@@ -129,7 +137,8 @@ class FirestoreService {
         'bio': '',
         'imageUrls': [], // Empty array - no default picture
         'interests': [],
-        'location': 'Abu Dhabi',
+        'location': 'Dubai, UAE',
+        'geoPoint': GeoPoint(lat, lng), // Add GeoPoint on creation
         'gender': '',
         'lookingFor': '',
         'distance': 50,
@@ -137,6 +146,7 @@ class FirestoreService {
         'ageRangeEnd': 50,
         'createdAt': FieldValue.serverTimestamp(),
         'lastActive': FieldValue.serverTimestamp(),
+        'lastLocationUpdate': FieldValue.serverTimestamp(),
         'profileComplete': false, // Add a flag to track profile completion
       };
 
@@ -151,7 +161,6 @@ class FirestoreService {
       throw e;
     }
   }
-
   // Get user data
   Future<User?> getUserData(String userId) async {
     try {

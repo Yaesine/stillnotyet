@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import '../animations/modern_match_animation.dart';
 import '../models/user_model.dart';
 import '../providers/user_provider.dart';
@@ -9,6 +11,7 @@ import '../services/profile_view_tracker.dart';
 import '../theme/app_theme.dart';
 import '../utils/custom_page_route.dart';
 import '../screens/modern_chat_screen.dart';
+import '../screens/premium_screen.dart';
 import '../utils/profile_options.dart';
 import 'components/letter_avatar.dart';
 import 'components/interest_chip.dart';
@@ -165,41 +168,41 @@ class _UserProfileDetailState extends State<UserProfileDetail>
                 ),
               ],
             ),
-            child: Row(
-              children: [
-                // Dislike button
-                Expanded(
-                  child: _buildActionButton(
-                    text: 'Pass',
-                    icon: Icons.close,
-                    color: Colors.grey.shade400,
-                    textColor: Colors.white,
-                    onPressed: () => _handleDislike(context),
+            child: FutureBuilder<bool>(
+              future: _checkIfMatched(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+
+                final isMatched = snapshot.data ?? false;
+
+                return SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _handleSendMessage(context, isMatched),
+                    icon: Icon(Icons.message, size: 20),
+                    label: const Text(
+                      'Send Message',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 3,
+                    ),
                   ),
-                ),
-
-                const SizedBox(width: 12),
-
-                // Super like button
-                _buildCircularActionButton(
-                  icon: Icons.star,
-                  color: Colors.blue,
-                  onPressed: () => _handleSuperLike(context),
-                ),
-
-                const SizedBox(width: 12),
-
-                // Like button
-                Expanded(
-                  child: _buildActionButton(
-                    text: 'Like',
-                    icon: Icons.favorite,
-                    color: AppColors.primary,
-                    textColor: Colors.white,
-                    onPressed: () => _handleLike(context),
-                  ),
-                ),
-              ],
+                );
+              },
             ),
           ),
         ),
@@ -885,6 +888,154 @@ class _UserProfileDetailState extends State<UserProfileDetail>
     } else {
       setState(() => _isSwipingDown = false);
     }
+  }
+
+  // Check if current user is matched with this profile
+  // Check if current user is matched with this profile
+  Future<bool> _checkIfMatched() async {
+    try {
+      final currentUserId = auth.FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId == null) return false;
+
+      // Check if there's a match document between these users
+      final matchQuery = await FirebaseFirestore.instance
+          .collection('matches')
+          .where('userId', isEqualTo: currentUserId)
+          .where('matchedUserId', isEqualTo: widget.user.id)
+          .limit(1)
+          .get();
+
+      return matchQuery.docs.isNotEmpty;
+    } catch (e) {
+      print('Error checking match status: $e');
+      return false;
+    }
+  }
+
+  // Handle send message button click
+  void _handleSendMessage(BuildContext context, bool isMatched) {
+    if (isMatched) {
+      // If matched, navigate directly to chat
+      Navigator.of(context).push(
+        CustomPageRoute(
+          child: const ModernChatScreen(),
+          settings: RouteSettings(arguments: widget.user),
+        ),
+      );
+    } else {
+      // If not matched, show premium upgrade dialog
+      _showPremiumUpgradeDialog(context);
+    }
+  }
+
+  // Show premium upgrade dialog
+  // Show premium upgrade dialog
+  void _showPremiumUpgradeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.amber.shade400,
+                  Colors.amber.shade600,
+                ],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.workspace_premium,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Upgrade to Premium',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Send messages to anyone with Premium!\n\nUnlock unlimited messaging and connect with ${widget.user.name} instantly.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // Upgrade button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(dialogContext);
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => PremiumScreen(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.amber.shade600,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Upgrade Now',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Cancel button
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text(
+                    'Maybe Later',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   // Action handlers

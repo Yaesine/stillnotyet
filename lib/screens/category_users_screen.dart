@@ -1,7 +1,9 @@
 // lib/screens/category_users_screen.dart
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../models/user_model.dart';
@@ -39,17 +41,35 @@ class _CategoryUsersScreenState extends State<CategoryUsersScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Simulate loading users with matching interests
-      await Future.delayed(const Duration(seconds: 1));
+      // Get all users from Firestore directly instead of just potential matches
+      final firestoreService = FirestoreService();
+      final allUsersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .get();
 
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final allUsers = userProvider.potentialMatches;
+      List<User> allUsers = [];
+      for (var doc in allUsersSnapshot.docs) {
+        try {
+          User user = User.fromFirestore(doc);
+          allUsers.add(user);
+        } catch (e) {
+          print('Error parsing user data: $e');
+        }
+      }
 
-      // Filter users by category interests
+      // Filter users by category interests (case-insensitive matching)
       _categoryUsers = allUsers.where((user) {
-        return user.interests.any((interest) =>
-            widget.category.relatedInterests.contains(interest));
+        return user.interests.any((interest) {
+          // Convert both to lowercase for case-insensitive comparison
+          String lowerInterest = interest.toLowerCase();
+          return widget.category.relatedInterests.any((categoryInterest) =>
+          categoryInterest.toLowerCase() == lowerInterest
+          );
+        });
       }).toList();
+
+      print('Found ${_categoryUsers.length} users for category ${widget.category.name}');
+      print('Category interests: ${widget.category.relatedInterests}');
 
       // Apply sorting
       _sortUsers();
