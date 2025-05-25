@@ -44,6 +44,7 @@ class ExploreEvent {
   final Color secondaryColor;
   final int participants;
   final bool isPremium;
+  final bool isSoldOut;
 
   ExploreEvent({
     required this.id,
@@ -57,6 +58,8 @@ class ExploreEvent {
     required this.secondaryColor,
     this.participants = 0,
     this.isPremium = false,
+    this.isSoldOut = false,
+
   });
 
   bool get isActive {
@@ -146,6 +149,7 @@ class _ExploreScreenState extends State<ExploreScreen>
   ];
 
   // Sample events - in production, these would come from backend
+  // Sample events - in production, these would come from backend
   final List<ExploreEvent> _events = [
     ExploreEvent(
       id: 'summer_vibes',
@@ -158,7 +162,7 @@ class _ExploreScreenState extends State<ExploreScreen>
       primaryColor: Colors.orange,
       secondaryColor: Colors.yellow,
       participants: 3421,
-      isPremium: false,
+      isPremium: true,
     ),
     ExploreEvent(
       id: 'festival_mode',
@@ -172,6 +176,90 @@ class _ExploreScreenState extends State<ExploreScreen>
       secondaryColor: Colors.pink,
       participants: 1892,
       isPremium: true,
+    ),
+    ExploreEvent(
+      id: 'coffee_culture',
+      title: 'Coffee Culture',
+      description: 'Meet fellow coffee enthusiasts and cafe hoppers',
+      imageUrl: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085',
+      startDate: DateTime.now().subtract(const Duration(days: 10)),
+      endDate: DateTime.now().subtract(const Duration(days: 1)),
+      badge: '☕',
+      primaryColor: Colors.brown,
+      secondaryColor: Colors.amber,
+      participants: 5234,
+      isPremium: true,
+      isSoldOut: true,
+    ),
+    ExploreEvent(
+      id: 'fitness_freaks',
+      title: 'Fitness Freaks',
+      description: 'Connect with gym buddies and workout partners',
+      imageUrl: 'https://images.unsplash.com/photo-1517836357463-d25dfeac3438',
+      startDate: DateTime.now().subtract(const Duration(days: 15)),
+      endDate: DateTime.now().subtract(const Duration(days: 5)),
+      badge: '💪',
+      primaryColor: Colors.red,
+      secondaryColor: Colors.orange,
+      participants: 4892,
+      isPremium: true,
+      isSoldOut: true,
+    ),
+    ExploreEvent(
+      id: 'foodie_fest',
+      title: 'Foodie Fest',
+      description: 'Discover culinary companions and restaurant explorers',
+      imageUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1',
+      startDate: DateTime.now().subtract(const Duration(days: 20)),
+      endDate: DateTime.now().subtract(const Duration(days: 10)),
+      badge: '🍔',
+      primaryColor: Colors.green,
+      secondaryColor: Colors.lime,
+      participants: 6789,
+      isPremium: true,
+      isSoldOut: true,
+    ),
+    ExploreEvent(
+      id: 'travel_tales',
+      title: 'Travel Tales',
+      description: 'Share adventures with fellow wanderlust souls',
+      imageUrl: 'https://images.unsplash.com/photo-1488646953014-85cb44e25828',
+      startDate: DateTime.now().subtract(const Duration(days: 25)),
+      endDate: DateTime.now().subtract(const Duration(days: 12)),
+      badge: '✈️',
+      primaryColor: Colors.blue,
+      secondaryColor: Colors.cyan,
+      participants: 7654,
+      isPremium: true,
+      isSoldOut: true,
+    ),
+    ExploreEvent(
+      id: 'art_attack',
+      title: 'Art Attack',
+      description: 'Creative minds unite for artistic connections',
+      imageUrl: 'https://images.unsplash.com/photo-1547891654-e66ed7ebb968',
+      startDate: DateTime.now().subtract(const Duration(days: 30)),
+      endDate: DateTime.now().subtract(const Duration(days: 18)),
+      badge: '🎨',
+      primaryColor: Colors.pink,
+      secondaryColor: Colors.purple,
+      participants: 3456,
+      isPremium: true,
+      isSoldOut: true,
+    ),
+    ExploreEvent(
+      id: 'book_club',
+      title: 'Book Club',
+      description: 'Literary lovers seeking reading companions',
+      imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d',
+      startDate: DateTime.now().subtract(const Duration(days: 35)),
+      endDate: DateTime.now().subtract(const Duration(days: 22)),
+      badge: '📚',
+      primaryColor: Colors.indigo,
+      secondaryColor: Colors.deepPurple,
+      participants: 2890,
+      isPremium: true,
+      isSoldOut: true,
     ),
   ];
 
