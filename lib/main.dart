@@ -195,11 +195,8 @@ class MyApp extends StatelessWidget {
                   unlockedBadges: [],
                   availableBadges: [],
                 ),
-                '/streak': (context) => StreakScreen(
-                  streakCount: 0,
-                  rewindCount: 1,
-                  superLikeCount: 1,
-                ),
+                '/streak': (context) => const StreakScreen(),
+
                 '/verification': (context) => ProfileVerificationScreen(),
                 '/themeSettings': (context) => ThemeSettingsScreen(),
                 '/privacy': (context) => const PrivacySafetyScreen(),

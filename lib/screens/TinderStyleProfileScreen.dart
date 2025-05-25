@@ -627,11 +627,8 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => StreakScreen(
-                      streakCount: 3,
-                      rewindCount: 1,
-                      superLikeCount: 1,
-                    ),
+                    builder: (context) => const StreakScreen(),
+
                   ),
                 );
               },
