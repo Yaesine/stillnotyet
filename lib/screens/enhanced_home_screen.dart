@@ -9,6 +9,7 @@ import '../widgets/components/app_button.dart';
 import '../widgets/enhanced_swipe_card.dart';
 import '../widgets/components/loading_indicator.dart';
 import '../screens/modern_chat_screen.dart';
+import '../widgets/optimized_swipe_card.dart';
 import 'nearby_users_screen.dart';
 import 'premium_screen.dart';
 import 'boost_screen.dart';
@@ -566,8 +567,8 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
     if (profiles.isNotEmpty) {
       stackChildren.add(
         Positioned.fill(
-          child: EnhancedSwipeCard(
-            key: ValueKey(profiles.first.id), // Add key to force rebuild
+          child: OptimizedSwipeCard(
+            key: ValueKey(profiles.first.id),
             user: profiles.first,
             isTop: true,
             onSwipeLeft: () => _handleSwipeLeft(profiles.first.id),
