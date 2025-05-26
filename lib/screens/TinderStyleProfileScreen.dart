@@ -260,6 +260,9 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
     );
   }
 
+// Modified section for lib/screens/TinderStyleProfileScreen.dart
+
+// This is the updated _buildProfileHeader method that fixes the text overlap issue
   Widget _buildProfileHeader(User user, bool isDarkMode) {
     return SliverAppBar(
       expandedHeight: 340,
@@ -329,7 +332,7 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
               ),
             ),
 
-            // User info overlay
+            // User info overlay - FIXED to prevent text overlap
             Positioned(
               bottom: 0,
               left: 0,
@@ -339,21 +342,26 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Wrap name in Expanded widget with overflow handling
                     Row(
                       children: [
-                        Text(
-                          '${user.name}, ${user.age}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            shadows: [
-                              Shadow(
-                                blurRadius: 8,
-                                color: Colors.black45,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
+                        Expanded(
+                          child: Text(
+                            '${user.name}, ${user.age}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              shadows: [
+                                Shadow(
+                                  blurRadius: 8,
+                                  color: Colors.black45,
+                                  offset: Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -372,6 +380,7 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
                       ],
                     ),
                     const SizedBox(height: 4),
+                    // Wrap location text in a Row with Expanded to handle overflow
                     Row(
                       children: [
                         const Icon(
@@ -380,18 +389,22 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
                           size: 16,
                         ),
                         const SizedBox(width: 4),
-                        Text(
-                          user.location,
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 16,
-                            shadows: [
-                              Shadow(
-                                blurRadius: 4,
-                                color: Colors.black38,
-                                offset: Offset(0, 1),
-                              ),
-                            ],
+                        Expanded(
+                          child: Text(
+                            user.location,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 16,
+                              shadows: [
+                                Shadow(
+                                  blurRadius: 4,
+                                  color: Colors.black38,
+                                  offset: Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                            maxLines: 1,
                           ),
                         ),
                       ],
@@ -419,6 +432,7 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
                         Navigator.of(context).pushNamed('/filters')
                             .then((_) => _loadUserData());
                       },
+                      tooltip: 'Filters',
                     ),
                   ),
 
@@ -440,10 +454,85 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
                           ),
                         ).then((_) => _loadUserData());
                       },
+                      tooltip: 'Edit Profile',
                     ),
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+// Also, add this method to ProfileImageGallery class to fix any similar issues there
+// Method to be added in the _ProfileImageGalleryState class in the same file
+  Widget _buildGradientOverlayWithText(User user) {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.transparent,
+              Colors.black.withOpacity(0.8),
+            ],
+            stops: const [0.0, 1.0],
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${user.name}, ${user.age}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      shadows: [
+                        Shadow(
+                          blurRadius: 8,
+                          color: Colors.black45,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on,
+                  color: Colors.white70,
+                  size: 16,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    user.location,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

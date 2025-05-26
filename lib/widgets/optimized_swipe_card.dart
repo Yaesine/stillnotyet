@@ -111,101 +111,81 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
 
     final fontSize = MediaQuery.of(context).size.width * 0.3;
 
-    return GestureDetector(
-      onHorizontalDragStart: widget.isTop ? (_) {
-        _isVerticalDrag = false;
-      } : null,
-      onHorizontalDragUpdate: widget.isTop ? _handleDragUpdate : null,
-      onHorizontalDragEnd: widget.isTop ? _handleDragEnd : null,
-      onVerticalDragStart: widget.isTop ? (_) {
-        _isVerticalDrag = true;
-      } : null,
-      onVerticalDragUpdate: widget.isTop ? _handleVerticalDragUpdate : null,
-      onVerticalDragEnd: widget.isTop ? _handleVerticalDragEnd : null,
-      onTap: () {
-        if (widget.isTop) {
-          setState(() {
-            _showInfo = !_showInfo;
-          });
-          // Track profile view
-          final tracker = ProfileViewTracker();
-          tracker.trackProfileView(widget.user.id);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Make sure we have safe margins - fit the card within available space
+        final double horizontalMargin = max(12.0, min(16.0, constraints.maxWidth * 0.05));
+        final double topMargin = max(80.0, min(100.0, constraints.maxHeight * 0.15));
+        final double bottomMargin = max(60.0, min(78.0, constraints.maxHeight * 0.12));
 
-          if (_showInfo && widget.onViewProfile != null) {
-            widget.onViewProfile!();
-          }
-        }
-      },
-      child: Opacity(
-        opacity: opacity,
-        child: Transform.translate(
-          offset: Offset(
-              widget.isTop && _dragOffset.abs() > 0 ? _dragOffset : 0,
-              widget.isTop && _verticalDragOffset < 0 ? _verticalDragOffset : 0
-          ),
-          child: Transform.rotate(
-            angle: widget.isTop && _dragOffset.abs() > 0 ? (_dragOffset / 1000) : 0,
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 100, 16, 78),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    spreadRadius: 2,
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
+        return GestureDetector(
+          onHorizontalDragStart: widget.isTop ? (_) {
+            _isVerticalDrag = false;
+          } : null,
+          onHorizontalDragUpdate: widget.isTop ? _handleDragUpdate : null,
+          onHorizontalDragEnd: widget.isTop ? _handleDragEnd : null,
+          onVerticalDragStart: widget.isTop ? (_) {
+            _isVerticalDrag = true;
+          } : null,
+          onVerticalDragUpdate: widget.isTop ? _handleVerticalDragUpdate : null,
+          onVerticalDragEnd: widget.isTop ? _handleVerticalDragEnd : null,
+          onTap: () {
+            if (widget.isTop) {
+              setState(() {
+                _showInfo = !_showInfo;
+              });
+              // Track profile view
+              final tracker = ProfileViewTracker();
+              tracker.trackProfileView(widget.user.id);
+
+              if (_showInfo && widget.onViewProfile != null) {
+                widget.onViewProfile!();
+              }
+            }
+          },
+          child: Opacity(
+            opacity: opacity,
+            child: Transform.translate(
+              offset: Offset(
+                  widget.isTop && _dragOffset.abs() > 0 ? _dragOffset : 0,
+                  widget.isTop && _verticalDragOffset < 0 ? _verticalDragOffset : 0
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Profile Image with optimized loading
-                    if (!_isImageLoaded)
-                    // Show a placeholder while waiting for image to load
-                      Container(
-                        color: Colors.grey[300],
-                        child: Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                          ),
-                        ),
-                      )
-                    else if (widget.user.imageUrls.isEmpty || _currentImageIndex >= widget.user.imageUrls.length)
-                    // Show letter avatar if no images
-                      Container(
-                        key: ValueKey<String>('letter-avatar-${widget.user.id}'),
-                        color: AppColors.primary,
-                        alignment: Alignment.center,
-                        child: Text(
-                          widget.user.name.isNotEmpty ? widget.user.name[0].toUpperCase() : '?',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      )
-                    else
-                    // Use CachedNetworkImage for better caching
-                      Hero(
-                        tag: 'profile_image_${widget.user.id}',
-                        child: CachedNetworkImage(
-                          key: ValueKey<int>(_currentImageIndex),
-                          imageUrl: widget.user.imageUrls[_currentImageIndex],
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
+              child: Transform.rotate(
+                angle: widget.isTop && _dragOffset.abs() > 0 ? (_dragOffset / 1000) : 0,
+                child: Container(
+                  // Updated margins to ensure card fits within screen bounds
+                  margin: EdgeInsets.fromLTRB(horizontalMargin, topMargin, horizontalMargin, bottomMargin),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        spreadRadius: 2,
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Profile Image with optimized loading
+                        if (!_isImageLoaded)
+                        // Show a placeholder while waiting for image to load
+                          Container(
                             color: Colors.grey[300],
                             child: Center(
                               child: CircularProgressIndicator(
                                 valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
                               ),
                             ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
+                          )
+                        else if (widget.user.imageUrls.isEmpty || _currentImageIndex >= widget.user.imageUrls.length)
+                        // Show letter avatar if no images
+                          Container(
+                            key: ValueKey<String>('letter-avatar-${widget.user.id}'),
                             color: AppColors.primary,
                             alignment: Alignment.center,
                             child: Text(
@@ -216,326 +196,362 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                          ),
-                        ),
-                      ),
-
-                    // Shiny border glow effect when card is active
-                    if (widget.isTop)
-                      Positioned.fill(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: _verticalDragOffset < -50
-                                  ? Colors.blue.withOpacity(0.8)
-                                  : _dragOffset > 50
-                                  ? Colors.green.withOpacity(0.8)
-                                  : _dragOffset < -50
-                                  ? Colors.red.withOpacity(0.8)
-                                  : Colors.white.withOpacity(0.2),
-                              width: 2,
+                          )
+                        else
+                        // Use CachedNetworkImage for better caching
+                          Hero(
+                            tag: 'profile_image_${widget.user.id}',
+                            child: CachedNetworkImage(
+                              key: ValueKey<int>(_currentImageIndex),
+                              imageUrl: widget.user.imageUrls[_currentImageIndex],
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[300],
+                                child: Center(
+                                  child: CircularProgressIndicator(
+                                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Container(
+                                color: AppColors.primary,
+                                alignment: Alignment.center,
+                                child: Text(
+                                  widget.user.name.isNotEmpty ? widget.user.name[0].toUpperCase() : '?',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: fontSize,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
 
-                    // Image pagination dots
-                    if (widget.user.imageUrls.length > 1)
-                      Positioned(
-                        top: 16,
-                        left: 0,
-                        right: 0,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            widget.user.imageUrls.length,
-                                (index) => AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              width: _currentImageIndex == index ? 24 : 8,
-                              height: 8,
-                              margin: const EdgeInsets.symmetric(horizontal: 3),
+                        // Shiny border glow effect when card is active
+                        if (widget.isTop)
+                          Positioned.fill(
+                            child: Container(
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(4),
-                                color: _currentImageIndex == index
-                                    ? AppColors.primary
-                                    : Colors.white.withOpacity(0.7),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // Swipe indicators
-                    if (widget.isTop)
-                      _buildSwipeIndicator(),
-
-                    // User info with gradient overlay
-                    Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        height: _showInfo ? 280 : 120,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Colors.black.withOpacity(0.9),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.9],
-                          ),
-                        ),
-                        child: SingleChildScrollView(
-                          physics: const NeverScrollableScrollPhysics(),
-                          child: Padding(
-                            padding: const EdgeInsets.all(20),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      '${widget.user.name}, ${widget.user.age}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 28,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.3),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.verified,
-                                        color: Colors.white,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.location_on,
-                                      color: Colors.white70,
-                                      size: 16,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      widget.user.location,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                if (_showInfo) ...[
-                                  const SizedBox(height: 24),
-                                  const Text(
-                                    'About',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    widget.user.bio,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      height: 1.4,
-                                    ),
-                                    maxLines: 4,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 24),
-                                  const Text(
-                                    'Interests',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: widget.user.interests.map((interest) => Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primary.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                                      ),
-                                      child: Text(
-                                        interest,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    )).toList(),
-                                  ),
-
-                                  // View Full Profile button
-                                  if (widget.onViewProfile != null) ...[
-                                    const SizedBox(height: 16),
-                                    Center(
-                                      child: ElevatedButton.icon(
-                                        onPressed: widget.onViewProfile,
-                                        icon: const Icon(Icons.person, size: 18),
-                                        label: const Text('View Full Profile'),
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.white,
-                                          foregroundColor: AppColors.primary,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(20),
-                                          ),
-                                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                                const SizedBox(height: 8),
-                                Center(
-                                  child: Icon(
-                                    _showInfo ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
-                                    color: Colors.white.withOpacity(0.7),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    // Left/Right image navigation
-                    if (widget.isTop && widget.user.imageUrls.length > 1)
-                      Row(
-                        children: [
-                          // Left side (previous image)
-                          Expanded(
-                            flex: 1,
-                            child: GestureDetector(
-                              onTap: _previousImage,
-                              behavior: HitTestBehavior.translucent,
-                              child: Container(
-                                color: Colors.transparent,
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: _currentImageIndex > 0
-                                      ? Container(
-                                    margin: const EdgeInsets.only(left: 12),
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.3),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.chevron_left,
-                                      color: Colors.white,
-                                      size: 30,
-                                    ),
-                                  )
-                                      : null,
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: _verticalDragOffset < -50
+                                      ? Colors.blue.withOpacity(0.8)
+                                      : _dragOffset > 50
+                                      ? Colors.green.withOpacity(0.8)
+                                      : _dragOffset < -50
+                                      ? Colors.red.withOpacity(0.8)
+                                      : Colors.white.withOpacity(0.2),
+                                  width: 2,
                                 ),
                               ),
                             ),
                           ),
 
-                          // Middle area (open/close profile details)
-                          Expanded(
-                            flex: 2,
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  _showInfo = !_showInfo;
-                                });
-                              },
-                              behavior: HitTestBehavior.translucent,
-                              child: Container(
-                                color: Colors.transparent,
-                              ),
-                            ),
-                          ),
-
-                          // Right side (next image)
-                          Expanded(
-                            flex: 1,
-                            child: GestureDetector(
-                              onTap: _nextImage,
-                              behavior: HitTestBehavior.translucent,
-                              child: Container(
-                                color: Colors.transparent,
-                                child: Align(
-                                  alignment: Alignment.centerRight,
-                                  child: _currentImageIndex < widget.user.imageUrls.length - 1
-                                      ? Container(
-                                    margin: const EdgeInsets.only(right: 12),
-                                    width: 40,
-                                    height: 40,
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.3),
-                                      shape: BoxShape.circle,
-                                    ),
-                                    child: const Icon(
-                                      Icons.chevron_right,
-                                      color: Colors.white,
-                                      size: 30,
-                                    ),
-                                  )
-                                      : null,
+                        // Image pagination dots
+                        if (widget.user.imageUrls.length > 1)
+                          Positioned(
+                            top: 16,
+                            left: 0,
+                            right: 0,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: List.generate(
+                                widget.user.imageUrls.length,
+                                    (index) => AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: _currentImageIndex == index ? 24 : 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(4),
+                                    color: _currentImageIndex == index
+                                        ? AppColors.primary
+                                        : Colors.white.withOpacity(0.7),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
 
-                    // Full profile view "hotspot" icon
-                    if (widget.isTop && widget.onViewProfile != null)
-                      Positioned(
-                        top: 24,
-                        right: 24,
-                        child: GestureDetector(
-                          onTap: widget.onViewProfile,
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
+                        // Swipe indicators
+                        if (widget.isTop)
+                          _buildSwipeIndicator(),
+
+                        // User info with gradient overlay
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 300),
+                            height: _showInfo ? 280 : 120,
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
-                              shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [
+                                  Colors.black.withOpacity(0.9),
+                                  Colors.transparent,
+                                ],
+                                stops: const [0.0, 0.9],
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.info_outline,
-                              color: Colors.white,
-                              size: 24,
+                            child: SingleChildScrollView(
+                              physics: const NeverScrollableScrollPhysics(),
+                              child: Padding(
+                                padding: const EdgeInsets.all(20),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment: CrossAxisAlignment.center,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            '${widget.user.name}, ${widget.user.age}',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 28,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withOpacity(0.3),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.verified,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on,
+                                          color: Colors.white70,
+                                          size: 16,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            widget.user.location,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (_showInfo) ...[
+                                      const SizedBox(height: 24),
+                                      const Text(
+                                        'About',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Text(
+                                        widget.user.bio,
+                                        style: const TextStyle(
+                                          color: Colors.white70,
+                                          height: 1.4,
+                                        ),
+                                        maxLines: 4,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 24),
+                                      const Text(
+                                        'Interests',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: widget.user.interests.map((interest) => Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary.withOpacity(0.2),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                                          ),
+                                          child: Text(
+                                            interest,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        )).toList(),
+                                      ),
+
+                                      // View Full Profile button
+                                      if (widget.onViewProfile != null) ...[
+                                        const SizedBox(height: 16),
+                                        Center(
+                                          child: ElevatedButton.icon(
+                                            onPressed: widget.onViewProfile,
+                                            icon: const Icon(Icons.person, size: 18),
+                                            label: const Text('View Full Profile'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: Colors.white,
+                                              foregroundColor: AppColors.primary,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(20),
+                                              ),
+                                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                    const SizedBox(height: 8),
+                                    Center(
+                                      child: Icon(
+                                        _showInfo ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
+                                        color: Colors.white.withOpacity(0.7),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
+
+                        // Left/Right image navigation
+                        if (widget.isTop && widget.user.imageUrls.length > 1)
+                          Row(
+                            children: [
+                              // Left side (previous image)
+                              Expanded(
+                                flex: 1,
+                                child: GestureDetector(
+                                  onTap: _previousImage,
+                                  behavior: HitTestBehavior.translucent,
+                                  child: Container(
+                                    color: Colors.transparent,
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: _currentImageIndex > 0
+                                          ? Container(
+                                        margin: const EdgeInsets.only(left: 12),
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.3),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.chevron_left,
+                                          color: Colors.white,
+                                          size: 30,
+                                        ),
+                                      )
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                              // Middle area (open/close profile details)
+                              Expanded(
+                                flex: 2,
+                                child: GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _showInfo = !_showInfo;
+                                    });
+                                  },
+                                  behavior: HitTestBehavior.translucent,
+                                  child: Container(
+                                    color: Colors.transparent,
+                                  ),
+                                ),
+                              ),
+
+                              // Right side (next image)
+                              Expanded(
+                                flex: 1,
+                                child: GestureDetector(
+                                  onTap: _nextImage,
+                                  behavior: HitTestBehavior.translucent,
+                                  child: Container(
+                                    color: Colors.transparent,
+                                    child: Align(
+                                      alignment: Alignment.centerRight,
+                                      child: _currentImageIndex < widget.user.imageUrls.length - 1
+                                          ? Container(
+                                        margin: const EdgeInsets.only(right: 12),
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: Colors.black.withOpacity(0.3),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.chevron_right,
+                                          color: Colors.white,
+                                          size: 30,
+                                        ),
+                                      )
+                                          : null,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                        // Full profile view "hotspot" icon
+                        if (widget.isTop && widget.onViewProfile != null)
+                          Positioned(
+                            top: 24,
+                            right: 24,
+                            child: GestureDetector(
+                              onTap: widget.onViewProfile,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.6),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.info_outline,
+                                  color: Colors.white,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

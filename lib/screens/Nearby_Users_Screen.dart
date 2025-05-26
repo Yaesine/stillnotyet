@@ -350,15 +350,17 @@ class _NearbyUsersScreenState extends State<NearbyUsersScreen> {
               ),
               title: Row(
                 children: [
-                  Text(
-                    '${user.name}, ${user.age}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                  Expanded(
+                    child: Text(
+                      '${user.name}, ${user.age}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const SizedBox(width: 8),
                   if (distance < 1)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -386,11 +388,14 @@ class _NearbyUsersScreenState extends State<NearbyUsersScreen> {
                     children: [
                       const Icon(Icons.location_on, size: 16, color: AppColors.primary),
                       const SizedBox(width: 4),
-                      Text(
-                        '${distance.toStringAsFixed(1)} km away',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w600,
+                      Expanded(
+                        child: Text(
+                          '${distance.toStringAsFixed(1)} km away',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -406,21 +411,23 @@ class _NearbyUsersScreenState extends State<NearbyUsersScreen> {
                   ),
                 ],
               ),
-              trailing: IconButton(
-                icon: Icon(
+              trailing: Container(
+                width: 20,
+                alignment: Alignment.centerRight,
+                child: Icon(
                   Icons.arrow_forward_ios,
                   size: 16,
                   color: isDarkMode ? AppColors.darkTextSecondary : Colors.grey,
                 ),
-                onPressed: () {
-                  // Navigate to profile detail
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => UserProfileDetail(user: user),
-                    ),
-                  );
-                },
               ),
+              onTap: () {
+                // Navigate to profile detail
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileDetail(user: user),
+                  ),
+                );
+              },
             ),
           );
         },
@@ -514,4 +521,3 @@ class _NearbyUsersScreenState extends State<NearbyUsersScreen> {
     );
   }
 }
-
