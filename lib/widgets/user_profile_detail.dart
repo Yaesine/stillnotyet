@@ -27,6 +27,147 @@ class UserProfileDetail extends StatefulWidget {
   @override
   _UserProfileDetailState createState() => _UserProfileDetailState();
 }
+// Add this class to the UserProfileDetail.dart file
+
+class ProfileImageGallery extends StatefulWidget {
+  final User user;
+
+  const ProfileImageGallery({
+    Key? key,
+    required this.user,
+  }) : super(key: key);
+
+  @override
+  _ProfileImageGalleryState createState() => _ProfileImageGalleryState();
+}
+
+class _ProfileImageGalleryState extends State<ProfileImageGallery> {
+  late PageController _pageController;
+  int _currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController(initialPage: 0);
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasMultipleImages = widget.user.imageUrls.length > 1;
+
+    return Stack(
+      children: [
+        // Image gallery
+        Positioned.fill(
+          child: widget.user.imageUrls.isEmpty
+              ? Center(
+            child: LetterAvatar(
+              name: widget.user.name,
+              size: 150,
+              showBorder: false,
+            ),
+          )
+              : PageView.builder(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() {
+                _currentPage = index;
+              });
+            },
+            itemCount: widget.user.imageUrls.length,
+            itemBuilder: (context, index) {
+              return Hero(
+                tag: index == 0 ? 'profile_image_${widget.user.id}' : 'profile_image_${widget.user.id}_$index',
+                child: CachedNetworkImage(
+                  imageUrl: widget.user.imageUrls[index],
+                  fit: BoxFit.cover,
+                  placeholder: (context, url) => Container(
+                    color: Colors.grey[300],
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                      ),
+                    ),
+                  ),
+                  errorWidget: (context, url, error) => LetterAvatar(
+                    name: widget.user.name,
+                    size: double.infinity,
+                    showBorder: false,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+
+        // Gradient overlays
+        Column(
+          children: [
+            // Top gradient
+            Container(
+              height: 120,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.6),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+            const Spacer(),
+            // Bottom gradient
+            Container(
+              height: 60,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withOpacity(0.4),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        // Image pagination indicators
+        if (hasMultipleImages)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 16,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                widget.user.imageUrls.length,
+                    (index) => Container(
+                  width: _currentPage == index ? 16 : 8,
+                  height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: _currentPage == index ? Colors.white : Colors.white.withOpacity(0.4),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 
 class _UserProfileDetailState extends State<UserProfileDetail>
     with SingleTickerProviderStateMixin {
@@ -225,27 +366,12 @@ class _UserProfileDetailState extends State<UserProfileDetail>
       ],
       flexibleSpace: Stack(
         children: [
-          // Image gallery
+          // Replace the old image gallery with our new component
           Positioned.fill(
-            child: _buildImageGallery(hasMultipleImages),
+            child: ProfileImageGallery(user: widget.user),
           ),
 
-          // Gradient overlays
-          _buildGradientOverlays(),
-
-          // Image pagination indicators
-          if (hasMultipleImages)
-            Positioned(
-              top: MediaQuery.of(context).padding.top + 16,
-              left: 0,
-              right: 0,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: _buildPageIndicators(widget.user.imageUrls.length),
-              ),
-            ),
-
-          // Pull down indicator
+          // Pull down indicator - keep this from the original
           if (_isSwipingDown)
             Positioned(
               top: 80,
@@ -758,7 +884,12 @@ class _UserProfileDetailState extends State<UserProfileDetail>
     )
         : PageView.builder(
       controller: _pageController,
-      onPageChanged: (index) => setState(() => _currentPage = index),
+      onPageChanged: (index) {
+        // Use this approach to prevent a full rebuild
+        _currentPage = index;
+        // Only rebuild the indicators, not the entire screen
+        if (mounted) setState(() {});
+      },
       itemCount: widget.user.imageUrls.length,
       itemBuilder: (context, index) {
         return Hero(
