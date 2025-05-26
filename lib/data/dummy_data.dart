@@ -140,7 +140,6 @@ class DummyData {
         age: 25,
         bio: 'Fashion blogger and stylist who believes style is a form of self-expression. I\'m passionate about sustainable fashion and helping others find their unique voice through clothing. When I\'m not curating looks, I\'m exploring local markets for vintage treasures.',
         imageUrls: [
-          'https://images.unsplash.com/photo-1502767089025-6572583495b9?w=500&auto=format&fit=crop&q=60',
           'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500&auto=format&fit=crop&q=60',
           'https://images.unsplash.com/photo-1488426862026-3ee34a7d66df?w=500&auto=format&fit=crop&q=60'
         ],
@@ -398,6 +397,8 @@ class DummyData {
         age: 33,
         bio: 'Michelin-trained chef running my own fusion restaurant. Food is my love language, and I believe the way to anyone\'s heart is through their stomach. Looking for someone who appreciates culinary adventures and isn\'t afraid to try my experimental dishes. Warning: I might cook for you on our first date!',
         imageUrls: [
+          'https://images.unsplash.com/photo-1523824921871-d6f1a15151f1?w=500&auto=format&fit=crop&q=60',
+          'https://images.unsplash.com/photo-1530785602389-07594beb8b73?w=500&auto=format&fit=crop&q=60',
           'https://images.unsplash.com/photo-1507152927804-b57577d17a8b?w=500&auto=format&fit=crop&q=60'
         ],
         interests: ['Cooking', 'Fine Dining', 'Wine', 'Travel', 'Food Photography', 'Gardening', 'Jazz'],

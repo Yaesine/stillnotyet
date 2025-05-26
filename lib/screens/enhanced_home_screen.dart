@@ -478,129 +478,187 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
   }
 
   Widget _buildSwipeCardStack(List<User> profiles) {
-    return Stack(
-      children: [
-        // Background decoration
-        Positioned(
-          top: -100,
-          right: -100,
-          child: Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.05),
-              shape: BoxShape.circle,
-            ),
+    // Create visual depth with decorative containers that won't interfere with gestures
+    List<Widget> stackChildren = [];
+
+    // Background decoration circles
+    stackChildren.add(
+      Positioned(
+        top: -100,
+        right: -100,
+        child: Container(
+          width: 200,
+          height: 200,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.05),
+            shape: BoxShape.circle,
           ),
         ),
-        Positioned(
-          bottom: -80,
-          left: -80,
-          child: Container(
-            width: 180,
-            height: 180,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.05),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-
-        // Swipe cards stack
-        ...profiles.asMap().entries.map((entry) {
-          final index = entry.key;
-          final user = entry.value;
-
-          return Positioned.fill(
-            child: EnhancedSwipeCard(
-              user: user,
-              isTop: index == profiles.length - 1,
-              onSwipeLeft: () => _handleSwipeLeft(user.id),
-              onSwipeRight: () => _handleSwipeRight(user.id),
-              onSuperLike: () => _handleSuperLike(user.id),
-              // Add profile view callback
-              onViewProfile: () => _showUserProfile(user),
-            ),
-          );
-        }).toList(),
-
-        // Control buttons at the bottom for the top card
-        if (profiles.isNotEmpty)
-          Positioned(
-            bottom: 10, //five button position height
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Rewind button (could be premium feature)
-                  SwipeActionButton(
-                    icon: Icons.replay,
-                    color: Colors.amber,
-                    onTap: () {
-                      // Implement rewind functionality (premium feature)
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Upgrade to premium to unlock this feature'),
-                          behavior: SnackBarBehavior.floating,
-                          action: SnackBarAction(
-                            label: 'UPGRADE',
-                            onPressed: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute(builder: (context) => PremiumScreen()),
-                              );
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                    size: 44,
-                  ),
-
-                  // Dislike button
-                  SwipeActionButton(
-                    icon: Icons.close,
-                    color: Colors.red,
-                    onTap: () => _handleSwipeLeft(profiles.last.id),
-                    size: 64,
-                  ),
-
-                  // Super like button
-                  SwipeActionButton(
-                    icon: Icons.star,
-                    color: Colors.blue,
-                    onTap: () => _handleSuperLike(profiles.last.id),
-                    isSuper: true,
-                    size: 54,
-                  ),
-
-                  // Like button
-                  SwipeActionButton(
-                    icon: Icons.favorite,
-                    color: AppColors.primary,
-                    onTap: () => _handleSwipeRight(profiles.last.id),
-                    size: 64,
-                  ),
-
-                  // Boost button
-                  SwipeActionButton(
-                    icon: Icons.bolt,
-                    color: Colors.purple,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => BoostScreen()),
-                      );
-                    },
-                    size: 44,
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
+      ),
     );
+
+    stackChildren.add(
+      Positioned(
+        bottom: -80,
+        left: -80,
+        child: Container(
+          width: 180,
+          height: 180,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.05),
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+
+    // Add shadow cards for visual depth ONLY if there are multiple profiles
+    // These are positioned BELOW the swipe area to avoid interference
+    if (profiles.length > 2) {
+      stackChildren.add(
+        Positioned(
+          left: 16,
+          right: 16,
+          top: 130, // Positioned lower to show only the top edge
+          bottom: 48,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              color: Colors.grey.shade200,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 2,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (profiles.length > 1) {
+      stackChildren.add(
+        Positioned(
+          left: 20,
+          right: 20,
+          top: 115, // Positioned to show slightly more
+          bottom: 63,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(24),
+              color: Colors.grey.shade300,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.08),
+                  blurRadius: 4,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Add the actual swipe card last so it's on top
+    if (profiles.isNotEmpty) {
+      stackChildren.add(
+        Positioned.fill(
+          child: EnhancedSwipeCard(
+            key: ValueKey(profiles.first.id), // Add key to force rebuild
+            user: profiles.first,
+            isTop: true,
+            onSwipeLeft: () => _handleSwipeLeft(profiles.first.id),
+            onSwipeRight: () => _handleSwipeRight(profiles.first.id),
+            onSuperLike: () => _handleSuperLike(profiles.first.id),
+            onViewProfile: () => _showUserProfile(profiles.first),
+          ),
+        ),
+      );
+    }
+
+    // Control buttons at the bottom for the top card
+    if (profiles.isNotEmpty) {
+      stackChildren.add(
+        Positioned(
+          bottom: 10, //five button position height
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Rewind button (could be premium feature)
+                SwipeActionButton(
+                  icon: Icons.replay,
+                  color: Colors.amber,
+                  onTap: () {
+                    // Implement rewind functionality (premium feature)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Upgrade to premium to unlock this feature'),
+                        behavior: SnackBarBehavior.floating,
+                        action: SnackBarAction(
+                          label: 'UPGRADE',
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(builder: (context) => PremiumScreen()),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                  size: 44,
+                ),
+
+                // Dislike button
+                SwipeActionButton(
+                  icon: Icons.close,
+                  color: Colors.red,
+                  onTap: () => _handleSwipeLeft(profiles.first.id),
+                  size: 64,
+                ),
+
+                // Super like button
+                SwipeActionButton(
+                  icon: Icons.star,
+                  color: Colors.blue,
+                  onTap: () => _handleSuperLike(profiles.first.id),
+                  isSuper: true,
+                  size: 54,
+                ),
+
+                // Like button
+                SwipeActionButton(
+                  icon: Icons.favorite,
+                  color: AppColors.primary,
+                  onTap: () => _handleSwipeRight(profiles.first.id),
+                  size: 64,
+                ),
+
+                // Boost button
+                SwipeActionButton(
+                  icon: Icons.bolt,
+                  color: Colors.purple,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => BoostScreen()),
+                    );
+                  },
+                  size: 44,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Stack(children: stackChildren);
   }
 
   // NEW: Swipe instruction overlay
