@@ -3,6 +3,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/services.dart';
+import 'package:new_tinder_clone/screens/premium_screen.dart';
 import 'package:new_tinder_clone/screens/privacy_policy_screen.dart';
 import 'package:new_tinder_clone/screens/terms_of_service_screen.dart';
 import 'package:provider/provider.dart';
@@ -373,63 +375,406 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
 
   Future<void> _deleteAccount() async {
     try {
-      final user = _auth.currentUser;
-      if (user == null) return;
+      // First, show a dialog asking why they want to delete their account
+      final deletionReason = await _showDeletionReasonDialog();
 
-      // 1. Delete user data from Firestore
-      final batch = _firestore.batch();
+      // If user canceled (returned null), exit the flow
+      if (deletionReason == null) return;
 
-      // Delete main user document
-      final userRef = _firestore.collection('users').doc(user.uid);
-      batch.delete(userRef);
+      // Second, try to retain the user with a discount offer
+      final continueWithDeletion = await _showRetentionDialog();
 
-      // Delete user's messages
-      final messagesQuery = await _firestore
-          .collection('messages')
-          .where('senderId', isEqualTo: user.uid)
-          .get();
+      // If user accepted the offer (returned false), exit the flow
+      if (!continueWithDeletion) return;
 
-      for (var doc in messagesQuery.docs) {
-        batch.delete(doc.reference);
-      }
+      // Finally, show email verification instructions
+      await _showEmailVerificationDialog();
 
-      // Delete user's matches
-      final matchesQuery = await _firestore
-          .collection('matches')
-          .where('userId', isEqualTo: user.uid)
-          .get();
-
-      for (var doc in matchesQuery.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // Delete user's likes/swipes
-      final swipesQuery = await _firestore
-          .collection('swipes')
-          .where('swiperId', isEqualTo: user.uid)
-          .get();
-
-      for (var doc in swipesQuery.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // Commit the batch deletion
-      await batch.commit();
-
-      // 2. Delete the user authentication record
-      await user.delete();
-
-      // 3. Sign out
-      await _auth.signOut();
-
-      // 4. Navigate to login screen
-      if (mounted) {
-        Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
-      }
+      // No automatic account deletion - this will be handled manually after email verification
     } catch (e) {
-      print('Error deleting account: $e');
-      _showErrorSnackBar('Error deleting account: ${e.toString()}');
+      print('Error in delete account flow: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('An error occurred. Please try again later.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  Future<String?> _showDeletionReasonDialog() async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    String? selectedReason;
+
+    // Common reasons for account deletion
+    final reasons = [
+      'I found a relationship',
+      'I\'m taking a break from dating',
+      'I\'m not getting enough matches',
+      'The app is too expensive',
+      'I\'m having technical issues',
+      'I don\'t like the user experience',
+      'Privacy concerns',
+      'Other reason'
+    ];
+
+    await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(
+            'We\'re sorry to see you go',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+            ),
+          ),
+          content: Container(
+            width: double.maxFinite,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Would you mind telling us why you\'re leaving?',
+                  style: TextStyle(
+                    color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 20),
+                Container(
+                  height: 300,
+                  width: double.maxFinite,
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: reasons.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        title: Text(reasons[index]),
+                        onTap: () {
+                          selectedReason = reasons[index];
+                          Navigator.of(context).pop();
+                        },
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        tileColor: isDarkMode ? AppColors.darkElevated : Colors.grey.shade50,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        hoverColor: AppColors.primary.withOpacity(0.1),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: AppColors.primary),
+              ),
+            ),
+          ],
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: isDarkMode ? AppColors.darkCard : Colors.white,
+        );
+      },
+    );
+
+    return selectedReason;
+  }
+
+  Future<bool> _showRetentionDialog() async {
+    bool continueWithDeletion = false;
+
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  AppColors.primary.withOpacity(0.8),
+                  AppColors.secondary,
+                ],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.discount,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Wait! Special Offer Just for You',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'We\'d love to keep you around! How about 30% OFF your next Premium subscription?',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.local_offer, color: Colors.white, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        'Marifecto30',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(Icons.copy, color: Colors.white, size: 18),
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: 'Marifecto30'));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Coupon code copied to clipboard')),
+                          );
+                        },
+                        constraints: BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                // Accept offer button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      continueWithDeletion = false;
+                      Navigator.pop(context);
+                      // Navigate to premium screen
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => PremiumScreen(),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Get 30% OFF Premium',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Continue with deletion button
+                TextButton(
+                  onPressed: () {
+                    continueWithDeletion = true;
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'No thanks, continue with deletion',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    return continueWithDeletion;
+  }
+
+  Future<void> _showEmailVerificationDialog() async {
+    final userEmail = FirebaseAuth.instance.currentUser?.email ?? "your registered email";
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Account Deletion Request'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'For security reasons, account deletion is handled by our team.',
+                style: TextStyle(height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Please send an email to:',
+                style: TextStyle(height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.email, color: AppColors.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'support@marifecto.com',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.copy, color: AppColors.primary, size: 18),
+                      onPressed: () {
+                        // Copy email to clipboard
+                        Clipboard.setData(ClipboardData(text: 'support@marifecto.com'));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Email copied to clipboard')),
+                        );
+                      },
+                      constraints: const BoxConstraints(),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                    height: 1.4,
+                  ),
+                  children: [
+                    const TextSpan(
+                      text: 'With the subject line: ',
+                    ),
+                    TextSpan(
+                      text: '"DELETE ACCOUNT"',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'In the body of the email, simply write "delete" and we will verify your request with the account email:',
+                style: TextStyle(height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                ),
+                child: Text(
+                  userEmail,
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Our team will process your request within 48 hours.',
+                style: TextStyle(height: 1.4),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // Optionally, log the user out after this
+                Provider.of<AppAuthProvider>(context, listen: false).logout().then((_) {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+                });
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('I confirm'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _showPrivacyInfoDialog(String title, String content) {
