@@ -5,11 +5,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:new_tinder_clone/providers/theme_provider.dart';
 import 'package:new_tinder_clone/screens/StyleProfileScreen.dart';
+import 'package:new_tinder_clone/screens/cookie_policy_screen.dart';
 import 'package:new_tinder_clone/screens/help_support_screen.dart';
 import 'package:new_tinder_clone/screens/likes_screen.dart';
 import 'package:new_tinder_clone/screens/notifications_screen.dart';
+import 'package:new_tinder_clone/screens/privacy_policy_screen.dart';
 import 'package:new_tinder_clone/screens/privacy_safety_screen.dart';
 import 'package:new_tinder_clone/screens/splash_screen.dart';
+import 'package:new_tinder_clone/screens/terms_of_service_screen.dart';
 import 'package:new_tinder_clone/screens/theme_settings_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -203,6 +206,10 @@ class MyApp extends StatelessWidget {
                 '/help': (context) => const HelpSupportScreen(),
                 '/notifications': (context) => const NotificationsScreen(),
                 '/nearby': (context) => const NearbyUsersScreen(),
+                // Add to routes in MaterialApp
+                '/privacy_policy': (context) => const PrivacyPolicyScreen(),
+                '/terms_of_service': (context) => const TermsOfServiceScreen(),
+                '/cookie_policy': (context) => const CookiePolicyScreen(),
               },
             ),
           ),

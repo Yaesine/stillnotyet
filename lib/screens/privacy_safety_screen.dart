@@ -1,11 +1,15 @@
 // lib/screens/privacy_safety_screen.dart
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:new_tinder_clone/screens/privacy_policy_screen.dart';
+import 'package:new_tinder_clone/screens/terms_of_service_screen.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../providers/app_auth_provider.dart';
 import 'dart:io' show Platform;
+
+import 'cookie_policy_screen.dart';
 
 class PrivacySafetyScreen extends StatefulWidget {
   const PrivacySafetyScreen({Key? key}) : super(key: key);
@@ -653,11 +657,10 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
                     ),
                     trailing: Icon(Icons.chevron_right, color: subTextColor),
                     onTap: () {
-                      // TODO: Open privacy policy
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Opening Privacy Policy...'),
-                          behavior: SnackBarBehavior.floating,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const PrivacyPolicyScreen(),
                         ),
                       );
                     },
@@ -685,11 +688,10 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
                     ),
                     trailing: Icon(Icons.chevron_right, color: subTextColor),
                     onTap: () {
-                      // TODO: Open terms of service
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Opening Terms of Service...'),
-                          behavior: SnackBarBehavior.floating,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const TermsOfServiceScreen(),
                         ),
                       );
                     },
@@ -717,11 +719,10 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
                     ),
                     trailing: Icon(Icons.chevron_right, color: subTextColor),
                     onTap: () {
-                      // TODO: Open cookie policy
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Opening Cookie Policy...'),
-                          behavior: SnackBarBehavior.floating,
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CookiePolicyScreen(),
                         ),
                       );
                     },
