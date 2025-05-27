@@ -188,10 +188,10 @@ class FirestoreService {
     return await getUserData(currentUserId!);
   }
 
-  // Get potential matches (users that are not current user and not already matched or swiped)
-// Add this to the FirestoreService class in lib/services/firestore_service.dart
 
-// Get potential matches with filters applied
+// Updated getPotentialMatches() method for FirestoreService class
+// Add this to lib/services/firestore_service.dart
+
   Future<List<User>> getPotentialMatches() async {
     try {
       if (currentUserId == null) {
@@ -199,32 +199,244 @@ class FirestoreService {
         return [];
       }
 
-      print('==== GETTING ALL POTENTIAL MATCHES ====');
+      print('==== GETTING FILTERED POTENTIAL MATCHES ====');
       print('Current user ID: $currentUserId');
 
-      // Simpler query: get ALL users except current user
-      QuerySnapshot usersSnapshot = await _usersCollection
-          .where(FieldPath.documentId, isNotEqualTo: currentUserId)
-          .limit(50)  // Increased limit to ensure we get enough users
-          .get();
+      // First, get the current user's preferences
+      DocumentSnapshot userDoc = await _usersCollection.doc(currentUserId).get();
+      if (!userDoc.exists) {
+        print('Current user document not found');
+        return [];
+      }
+
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
+      // Extract filter preferences
+      String lookingFor = userData['lookingFor'] ?? '';
+      int ageRangeStart = userData['ageRangeStart'] ?? 18;
+      int ageRangeEnd = userData['ageRangeEnd'] ?? 50;
+      int maxDistance = userData['distance'] ?? 50;
+      bool showProfilesWithPhoto = userData['showProfilesWithPhoto'] ?? true;
+      bool showVerifiedOnly = userData['showVerifiedOnly'] ?? false;
+
+      // Advanced filters
+      List<String> prioritizedInterests = [];
+      if (userData['prioritizedInterests'] != null) {
+        prioritizedInterests = List<String>.from(userData['prioritizedInterests']);
+      }
+
+      // Professional filters
+      bool filterByProfessional = userData['filterByProfessional'] ?? false;
+      bool filterHasJobTitle = userData['filterHasJobTitle'] ?? false;
+      String filterEducationLevel = userData['filterEducationLevel'] ?? '';
+
+      // Relationship filters
+      List<String> filterRelationshipGoals = [];
+      if (userData['filterRelationshipGoals'] != null) {
+        filterRelationshipGoals = List<String>.from(userData['filterRelationshipGoals']);
+      }
+
+      // Height preferences
+      List<String> filterHeightPreferences = [];
+      if (userData['filterHeightPreferences'] != null) {
+        filterHeightPreferences = List<String>.from(userData['filterHeightPreferences']);
+      }
+
+      // Basics filters
+      List<String> filterZodiacSigns = [];
+      if (userData['filterZodiacSigns'] != null) {
+        filterZodiacSigns = List<String>.from(userData['filterZodiacSigns']);
+      }
+
+      List<String> filterFamilyPlans = [];
+      if (userData['filterFamilyPlans'] != null) {
+        filterFamilyPlans = List<String>.from(userData['filterFamilyPlans']);
+      }
+
+      // Lifestyle filters
+      List<String> filterDrinkingHabits = [];
+      if (userData['filterDrinkingHabits'] != null) {
+        filterDrinkingHabits = List<String>.from(userData['filterDrinkingHabits']);
+      }
+
+      List<String> filterSmokingHabits = [];
+      if (userData['filterSmokingHabits'] != null) {
+        filterSmokingHabits = List<String>.from(userData['filterSmokingHabits']);
+      }
+
+      // Language filters
+      List<String> filterLanguagePreferences = [];
+      if (userData['filterLanguagePreferences'] != null) {
+        filterLanguagePreferences = List<String>.from(userData['filterLanguagePreferences']);
+      }
+
+      print('Filter preferences loaded:');
+      print('- Looking for: ${lookingFor.isEmpty ? "Everyone" : lookingFor}');
+      print('- Age range: $ageRangeStart to $ageRangeEnd');
+      print('- Max distance: $maxDistance km');
+      print('- Show profiles with photo only: $showProfilesWithPhoto');
+      print('- Show verified only: $showVerifiedOnly');
+      print('- Prioritized interests: $prioritizedInterests');
+
+      // Start building the query
+      Query usersQuery = _usersCollection.where(FieldPath.documentId, isNotEqualTo: currentUserId);
+
+      // Apply gender filter if specified
+      if (lookingFor.isNotEmpty) {
+        usersQuery = usersQuery.where('gender', isEqualTo: lookingFor);
+      }
+
+      // Apply age filter
+      usersQuery = usersQuery.where('age', isGreaterThanOrEqualTo: ageRangeStart)
+          .where('age', isLessThanOrEqualTo: ageRangeEnd);
+
+      // Execute the query
+      QuerySnapshot usersSnapshot = await usersQuery.limit(50).get();
 
       print('Raw query returned ${usersSnapshot.docs.length} users');
 
-      // Convert all users to User objects
-      List<User> allUsers = [];
+      // Convert to User objects and apply filters that can't be done in Firestore directly
+      List<User> filteredUsers = [];
+      GeoPoint? currentUserLocation;
+
+      // Get current user's location for distance calculation
+      if (userData.containsKey('geoPoint')) {
+        currentUserLocation = userData['geoPoint'] as GeoPoint;
+      }
+
       for (var doc in usersSnapshot.docs) {
         try {
-          Map<String, dynamic> userData = doc.data() as Map<String, dynamic>;
-          print('Processing user: ${doc.id} - ${userData['name']}');
+          Map<String, dynamic> potentialMatchData = doc.data() as Map<String, dynamic>;
 
+          // Skip users without photos if filter enabled
+          if (showProfilesWithPhoto &&
+              (potentialMatchData['imageUrls'] == null ||
+                  (potentialMatchData['imageUrls'] as List).isEmpty)) {
+            continue;
+          }
+
+          // Apply distance filter if locations available
+          if (currentUserLocation != null &&
+              potentialMatchData.containsKey('geoPoint') &&
+              potentialMatchData['geoPoint'] != null) {
+            GeoPoint matchLocation = potentialMatchData['geoPoint'] as GeoPoint;
+            double distance = calculateDistance(currentUserLocation, matchLocation);
+
+            if (distance > maxDistance) {
+              continue; // Skip if beyond max distance
+            }
+          }
+
+          // Apply professional filters
+          if (filterByProfessional) {
+            // Skip if job title required but not present
+            if (filterHasJobTitle &&
+                (potentialMatchData['jobTitle'] == null ||
+                    potentialMatchData['jobTitle'].toString().isEmpty)) {
+              continue;
+            }
+
+            // Skip if education level doesn't match
+            if (filterEducationLevel.isNotEmpty &&
+                (potentialMatchData['education'] != filterEducationLevel)) {
+              continue;
+            }
+          }
+
+          // Apply relationship goals filter
+          if (filterRelationshipGoals.isNotEmpty &&
+              potentialMatchData.containsKey('relationshipGoals') &&
+              !filterRelationshipGoals.contains(potentialMatchData['relationshipGoals'])) {
+            continue;
+          }
+
+          // Apply height filter
+          if (filterHeightPreferences.isNotEmpty &&
+              potentialMatchData.containsKey('height') &&
+              !filterHeightPreferences.contains(potentialMatchData['height'])) {
+            continue;
+          }
+
+          // Apply zodiac sign filter
+          if (filterZodiacSigns.isNotEmpty &&
+              potentialMatchData.containsKey('zodiacSign') &&
+              !filterZodiacSigns.contains(potentialMatchData['zodiacSign'])) {
+            continue;
+          }
+
+          // Apply family plans filter
+          if (filterFamilyPlans.isNotEmpty &&
+              potentialMatchData.containsKey('familyPlans') &&
+              !filterFamilyPlans.contains(potentialMatchData['familyPlans'])) {
+            continue;
+          }
+
+          // Apply drinking habits filter
+          if (filterDrinkingHabits.isNotEmpty &&
+              potentialMatchData.containsKey('drinking') &&
+              !filterDrinkingHabits.contains(potentialMatchData['drinking'])) {
+            continue;
+          }
+
+          // Apply smoking habits filter
+          if (filterSmokingHabits.isNotEmpty &&
+              potentialMatchData.containsKey('smoking') &&
+              !filterSmokingHabits.contains(potentialMatchData['smoking'])) {
+            continue;
+          }
+
+          // Apply language filter - any one of the selected languages must be in user's languages
+          if (filterLanguagePreferences.isNotEmpty &&
+              potentialMatchData.containsKey('languagesKnown')) {
+            List<String> userLanguages = [];
+            if (potentialMatchData['languagesKnown'] is List) {
+              userLanguages = List<String>.from(potentialMatchData['languagesKnown']);
+            }
+
+            bool hasMatchingLanguage = false;
+            for (String lang in filterLanguagePreferences) {
+              if (userLanguages.contains(lang)) {
+                hasMatchingLanguage = true;
+                break;
+              }
+            }
+
+            if (!hasMatchingLanguage) {
+              continue;
+            }
+          }
+
+          // Apply interests filter if specified
+          if (prioritizedInterests.isNotEmpty && potentialMatchData.containsKey('interests')) {
+            List<String> userInterests = [];
+            if (potentialMatchData['interests'] is List) {
+              userInterests = List<String>.from(potentialMatchData['interests']);
+            }
+
+            // Check if user has at least one of the prioritized interests
+            bool hasMatchingInterest = false;
+            for (String interest in prioritizedInterests) {
+              if (userInterests.contains(interest)) {
+                hasMatchingInterest = true;
+                break;
+              }
+            }
+
+            if (!hasMatchingInterest) {
+              continue; // Skip if no matching interests
+            }
+          }
+
+          // If we get here, all filters passed
           User user = User.fromFirestore(doc);
-          allUsers.add(user);
+          filteredUsers.add(user);
+
         } catch (e) {
           print('Error parsing user ${doc.id}: $e');
         }
       }
 
-      print('Successfully parsed ${allUsers.length} users');
+      print('FILTERED RESULT: ${filteredUsers.length} potential matches after applying filters');
 
       // Get users the current user has already swiped on
       QuerySnapshot swipesSnapshot = await _swipesCollection
@@ -244,17 +456,13 @@ class FirestoreService {
       print('User has already swiped on ${swipedUserIds.length} users');
 
       // Filter out users already swiped
-      List<User> potentialMatches = allUsers
+      filteredUsers = filteredUsers
           .where((user) => !swipedUserIds.contains(user.id))
           .toList();
 
-      print('FINAL RESULT: ${potentialMatches.length} potential matches');
-      // Print each match for debugging
-      for (var user in potentialMatches) {
-        print('- Match: ${user.name} (ID: ${user.id})');
-      }
+      print('FINAL RESULT: ${filteredUsers.length} potential matches');
 
-      return potentialMatches;
+      return filteredUsers;
     } catch (e) {
       print('Error getting potential matches: $e');
       return [];

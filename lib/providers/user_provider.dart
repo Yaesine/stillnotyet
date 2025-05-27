@@ -167,7 +167,7 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      print('===== LOADING POTENTIAL MATCHES =====');
+      print('===== LOADING FILTERED POTENTIAL MATCHES =====');
 
       if (_firestoreService.currentUserId == null) {
         print('ERROR: No current user ID available');
@@ -177,15 +177,18 @@ class UserProvider with ChangeNotifier {
       // Force refresh of test users to ensure some users exist
       await _firestoreService.createTestUsersIfNeeded();
 
-      // Get all potential matches with minimal filtering
+      // Get potential matches with filtering applied
       _potentialMatches = await _firestoreService.getPotentialMatches();
 
-      print('Loaded ${_potentialMatches.length} potential matches from Firestore');
+      print('Loaded ${_potentialMatches.length} filtered potential matches from Firestore');
 
       // ONLY use dummy data if absolutely no matches were found
       if (_potentialMatches.isEmpty) {
         print('WARNING: No potential matches found in Firestore, using remote dummy data');
         _potentialMatches = await DummyData.getDummyUsersAsync();
+
+        // Apply filters to dummy data as well
+        _potentialMatches = await _applyFiltersToLocalData(_potentialMatches);
       }
     } catch (e) {
       _errorMessage = 'Failed to load potential matches: $e';
@@ -193,12 +196,60 @@ class UserProvider with ChangeNotifier {
 
       // Only use dummy data if there was an error
       _potentialMatches = await DummyData.getDummyUsersAsync();
+
+      // Apply filters to dummy data as well
+      _potentialMatches = await _applyFiltersToLocalData(_potentialMatches);
     } finally {
       _isLoading = false;
       notifyListeners();
-      print('===== FINISHED LOADING POTENTIAL MATCHES =====');
+      print('===== FINISHED LOADING FILTERED POTENTIAL MATCHES =====');
     }
-  }  Future<void> loadUsersWhoLikedMe() async {
+  }
+
+// Helper method to apply filters locally to dummy data
+  Future<List<User>> _applyFiltersToLocalData(List<User> users) async {
+    try {
+      // Get current user to access filter preferences
+      User? currentUser = await _firestoreService.getCurrentUserData();
+      if (currentUser == null) return users;
+
+      // Get user document to access filter settings
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.id)
+          .get();
+
+      if (!userDoc.exists) return users;
+
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
+      // Apply basic filters
+      List<User> filtered = users.where((user) {
+        // Apply gender filter
+        if (currentUser.lookingFor.isNotEmpty &&
+            user.gender != currentUser.lookingFor) {
+          return false;
+        }
+
+        // Apply age filter
+        if (user.age < currentUser.ageRangeStart ||
+            user.age > currentUser.ageRangeEnd) {
+          return false;
+        }
+
+        // Apply other filters from userData if necessary
+        // [Add any additional filter logic as needed]
+
+        return true;
+      }).toList();
+
+      return filtered;
+    } catch (e) {
+      print('Error applying filters to local data: $e');
+      return users; // Return original list on error
+    }
+  }
+  Future<void> loadUsersWhoLikedMe() async {
     _isLoading = true;
     notifyListeners();
 
