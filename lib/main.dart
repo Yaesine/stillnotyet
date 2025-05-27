@@ -174,7 +174,7 @@ class MyApp extends StatelessWidget {
           builder: (context, themeProvider, child) => NotificationHandler(
             child: MaterialApp(
               navigatorKey: navigatorKey,
-              title: 'STILL - Dating App',
+              title: 'Marifecto - Dating App',
               // Update theme configuration with enhanced themes
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,

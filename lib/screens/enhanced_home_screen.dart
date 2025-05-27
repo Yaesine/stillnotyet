@@ -48,13 +48,166 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
     });
   }
 
+  // Modify the AppBar's filter button handler
+  PreferredSizeWidget _buildAppBar() {
+    return PreferredSize(
+      preferredSize: Size.fromHeight(60),
+      child: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.primary,
+                    AppColors.secondary,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.primary.withOpacity(0.3),
+                    blurRadius: 10,
+                    spreadRadius: 0,
+                    offset: Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.whatshot,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Marifecto',
+              style: TextStyle(
+                color: _isLoading ? Colors.white : AppColors.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          // Premium button
+          Container(
+            margin: EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.workspace_premium,
+                color: Colors.amber,
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => PremiumScreen()),
+                );
+              },
+              tooltip: 'Premium',
+            ),
+          ),
+
+          // Nearby users button
+          Container(
+            margin: EdgeInsets.only(right: 16),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
+            child: IconButton(
+              icon: const Icon(
+                Icons.location_on,
+                color: AppColors.primary,
+              ),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const NearbyUsersScreen(),
+                  ),
+                );
+              },
+              tooltip: 'Nearby',
+            ),
+          ),
+        ],
+        // Modify the filter button handler to reload matches after filter changes
+        leading: Container(
+          margin: EdgeInsets.only(left: 16),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 4,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: const Icon(
+              Icons.filter_list,
+              color: Colors.orange,
+            ),
+            onPressed: () {
+              setState(() {
+                _showFilters = !_showFilters;
+              });
+              // Navigate to filters screen and reload matches when returning
+              Navigator.of(context).pushNamed('/filters').then((_) {
+                // Show loading indicator
+                setState(() {
+                  _isLoading = true;
+                });
+                // Reload matches with new filters
+                _loadMatches();
+              });
+            },
+            tooltip: 'Filters',
+          ),
+        ),
+        centerTitle: true,
+      ),
+    );
+  }
+
   Future<void> _loadMatches() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      await Provider.of<UserProvider>(context, listen: false).loadPotentialMatches();
+      // Show loading indicator for at least 800ms for better UX
+      await Future.wait([
+        Provider.of<UserProvider>(context, listen: false).loadPotentialMatches(),
+        Future.delayed(const Duration(milliseconds: 800)), // Minimum loading time
+      ]);
     } catch (e) {
       print('Error loading matches: $e');
       // Show error snackbar
@@ -339,144 +492,6 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
     );
   }
 
-  PreferredSizeWidget _buildAppBar() {
-    return PreferredSize(
-      preferredSize: Size.fromHeight(60),
-      child: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.primary,
-                    AppColors.secondary,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primary.withOpacity(0.3),
-                    blurRadius: 10,
-                    spreadRadius: 0,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.whatshot,
-                color: Colors.white,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'STILL',
-              style: TextStyle(
-                color: _isLoading ? Colors.white : AppColors.textPrimary,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // Premium button
-          Container(
-            margin: EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IconButton(
-              icon: const Icon(
-                Icons.workspace_premium,
-                color: Colors.amber,
-              ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => PremiumScreen()),
-                );
-              },
-              tooltip: 'Premium',
-            ),
-          ),
-
-          // Nearby users button
-          Container(
-            margin: EdgeInsets.only(right: 16),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: IconButton(
-              icon: const Icon(
-                Icons.location_on,
-                color: AppColors.primary,
-              ),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const NearbyUsersScreen(),
-                  ),
-                );
-              },
-              tooltip: 'Nearby',
-            ),
-          ),
-        ],
-        leading: Container(
-          margin: EdgeInsets.only(left: 16),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: IconButton(
-            icon: const Icon(
-              Icons.filter_list,
-              color: Colors.orange,
-            ),
-            onPressed: () {
-              setState(() {
-                _showFilters = !_showFilters;
-              });
-              Navigator.of(context).pushNamed('/filters');
-            },
-            tooltip: 'Filters',
-          ),
-        ),
-        centerTitle: true,
-      ),
-    );
-  }
 
   Widget _buildSwipeCardStack(List<User> profiles) {
     // Create visual depth with decorative containers that won't interfere with gestures

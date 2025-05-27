@@ -159,6 +159,8 @@ class UserProvider with ChangeNotifier {
   }
 
   // Load potential matches
+// Update this method in lib/providers/user_provider.dart
+
   Future<void> loadPotentialMatches() async {
     _isLoading = true;
     _errorMessage = null;
@@ -173,7 +175,7 @@ class UserProvider with ChangeNotifier {
         throw Exception('No current user ID available');
       }
 
-      print('Attempting to load potential matches from Firestore...');
+      print('Attempting to load potential matches from Firestore with filters applied...');
       _potentialMatches = await _firestoreService.getPotentialMatches();
       print('Loaded ${_potentialMatches.length} potential matches');
 
@@ -181,28 +183,57 @@ class UserProvider with ChangeNotifier {
       if (_potentialMatches.isNotEmpty) {
         print('Potential matches:');
         for (var match in _potentialMatches) {
-          print('- User: ${match.name} (ID: ${match.id})');
+          print('- User: ${match.name} (ID: ${match.id}, Age: ${match.age})');
         }
       }
 
-      // Only use dummy data if Firebase returned no results
-      if (_potentialMatches.isEmpty) {
+      // Only use dummy data if Firebase returned no results and we're in development mode
+      if (_potentialMatches.isEmpty && const bool.fromEnvironment('dart.vm.product') == false) {
         print('No potential matches found in Firestore, using dummy data');
         _potentialMatches = DummyData.getDummyUsers();
+
+        // Apply basic filtering to dummy data as well
+        if (_currentUser != null) {
+          // Filter dummy data by age
+          _potentialMatches = _potentialMatches.where((user) {
+            return user.age >= _currentUser!.ageRangeStart &&
+                user.age <= _currentUser!.ageRangeEnd;
+          }).toList();
+
+          // Filter by gender if looking for specific gender
+          if (_currentUser!.lookingFor.isNotEmpty) {
+            _potentialMatches = _potentialMatches.where((user) {
+              return user.gender == _currentUser!.lookingFor;
+            }).toList();
+          }
+        }
       }
     } catch (e) {
       _errorMessage = 'Failed to load potential matches: $e';
       print('ERROR loading potential matches: $e');
-      // Fall back to dummy data on error
-      print('Falling back to dummy data due to error');
-      _potentialMatches = DummyData.getDummyUsers();
+      // Fall back to dummy data on error in development mode
+      if (const bool.fromEnvironment('dart.vm.product') == false) {
+        print('Falling back to dummy data due to error');
+        _potentialMatches = DummyData.getDummyUsers();
+
+        // Apply basic filtering to dummy data
+        if (_currentUser != null) {
+          // Filter dummy data by age and gender (as above)
+          _potentialMatches = _potentialMatches.where((user) {
+            bool ageMatch = user.age >= _currentUser!.ageRangeStart &&
+                user.age <= _currentUser!.ageRangeEnd;
+            bool genderMatch = _currentUser!.lookingFor.isEmpty ||
+                user.gender == _currentUser!.lookingFor;
+            return ageMatch && genderMatch;
+          }).toList();
+        }
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
       print('==== FINISHED LOADING POTENTIAL MATCHES ====');
     }
   }
-
   // Load users who have liked the current user
   Future<void> loadUsersWhoLikedMe() async {
     _isLoading = true;

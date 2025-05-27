@@ -189,6 +189,9 @@ class FirestoreService {
   }
 
   // Get potential matches (users that are not current user and not already matched or swiped)
+// Add this to the FirestoreService class in lib/services/firestore_service.dart
+
+// Get potential matches with filters applied
   Future<List<User>> getPotentialMatches() async {
     try {
       if (currentUserId == null) {
@@ -196,24 +199,183 @@ class FirestoreService {
         return [];
       }
 
-      print('Fetching ALL users from Firestore to find potential matches');
+      print('Fetching potential matches with filters for $currentUserId');
 
-      // Get ALL users except the current user
+      // First, get the current user's filter preferences
+      DocumentSnapshot userDoc = await _usersCollection.doc(currentUserId).get();
+      final userData = userDoc.data() as Map<String, dynamic>?;
+
+      if (userData == null) {
+        print('Unable to load user data for filter preferences');
+        return [];
+      }
+
+      // Extract filter preferences
+      final ageRangeStart = userData['ageRangeStart'] ?? 18;
+      final ageRangeEnd = userData['ageRangeEnd'] ?? 50;
+      final maxDistance = userData['distance'] ?? 100;
+      final lookingFor = userData['lookingFor'] ?? ''; // Gender preference
+
+      // Advanced filters
+      final showProfilesWithPhoto = userData['showProfilesWithPhoto'] ?? true;
+      final showVerifiedOnly = userData['showVerifiedOnly'] ?? false;
+      final selectedInterests = userData['prioritizedInterests'] as List<dynamic>? ?? [];
+
+      // Other filters
+      final filterByProfessional = userData['filterByProfessional'] ?? false;
+      final filterHasJobTitle = userData['filterHasJobTitle'] ?? false;
+      final filterEducationLevel = userData['filterEducationLevel'] ?? '';
+
+      // Multi-select filters
+      final filterRelationshipGoals = userData['filterRelationshipGoals'] as List<dynamic>? ?? [];
+      final filterHeightPreferences = userData['filterHeightPreferences'] as List<dynamic>? ?? [];
+      final filterZodiacSigns = userData['filterZodiacSigns'] as List<dynamic>? ?? [];
+      final filterFamilyPlans = userData['filterFamilyPlans'] as List<dynamic>? ?? [];
+      final filterPersonalityTypes = userData['filterPersonalityTypes'] as List<dynamic>? ?? [];
+      final filterCommunicationStyles = userData['filterCommunicationStyles'] as List<dynamic>? ?? [];
+      final filterLoveLanguages = userData['filterLoveLanguages'] as List<dynamic>? ?? [];
+      final filterPetPreferences = userData['filterPetPreferences'] as List<dynamic>? ?? [];
+      final filterDrinkingHabits = userData['filterDrinkingHabits'] as List<dynamic>? ?? [];
+      final filterSmokingHabits = userData['filterSmokingHabits'] as List<dynamic>? ?? [];
+      final filterWorkoutFrequency = userData['filterWorkoutFrequency'] as List<dynamic>? ?? [];
+      final filterDietaryPreferences = userData['filterDietaryPreferences'] as List<dynamic>? ?? [];
+      final filterSocialMediaUsage = userData['filterSocialMediaUsage'] as List<dynamic>? ?? [];
+      final filterSleepingHabits = userData['filterSleepingHabits'] as List<dynamic>? ?? [];
+      final filterLanguagePreferences = userData['filterLanguagePreferences'] as List<dynamic>? ?? [];
+
+      print('Applying filters: age=$ageRangeStart-$ageRangeEnd, distance=$maxDistance, lookingFor=$lookingFor');
+      print('Advanced filters: showProfilesWithPhoto=$showProfilesWithPhoto, showVerifiedOnly=$showVerifiedOnly');
+      print('Selected interests: $selectedInterests');
+
+      // Build basic query for all users except current user
+      QuerySnapshot usersSnapshot = await _usersCollection.get();
       List<User> allUsers = [];
 
-      // Fetch all users from Firestore
-      QuerySnapshot usersSnapshot = await _usersCollection.get();
+      // Current user's geoPoint for distance calculation
+      GeoPoint? currentUserGeoPoint = userData['geoPoint'] as GeoPoint?;
 
       print('Found ${usersSnapshot.docs.length} total users in database');
 
-      // Filter out the current user
+      // Filter users based on criteria
       for (var doc in usersSnapshot.docs) {
         String userId = doc.id;
         if (userId != currentUserId) {
           try {
-            User user = User.fromFirestore(doc);
-            allUsers.add(user);
-            print('Added user ${user.name} (ID: ${user.id}) to potential matches list');
+            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+            // Basic filters
+            int userAge = data['age'] ?? 0;
+            bool ageMatch = userAge >= ageRangeStart && userAge <= ageRangeEnd;
+
+            // Gender filter
+            bool genderMatch = lookingFor.isEmpty || data['gender'] == lookingFor;
+
+            // Distance filter
+            bool distanceMatch = true;
+            if (currentUserGeoPoint != null && data['geoPoint'] != null) {
+              // Use the LocationService to calculate distance
+              double distance = calculateDistance(
+                  currentUserGeoPoint,
+                  data['geoPoint'] as GeoPoint
+              );
+              distanceMatch = distance <= maxDistance;
+            }
+
+            // Photo filter
+            bool photoMatch = !showProfilesWithPhoto ||
+                (data['imageUrls'] != null && (data['imageUrls'] as List).isNotEmpty);
+
+            // Verified filter - assuming there's a 'verified' field
+            bool verifiedMatch = !showVerifiedOnly || (data['verified'] == true);
+
+            // Interest filter
+            bool interestMatch = true;
+            if (selectedInterests.isNotEmpty) {
+              List<String> userInterests = List<String>.from(data['interests'] ?? []);
+              // Check if user has ANY of the selected interests
+              interestMatch = selectedInterests.any((interest) =>
+                  userInterests.contains(interest));
+            }
+
+            // Apply professional filters
+            bool professionalMatch = true;
+            if (filterByProfessional) {
+              if (filterHasJobTitle && (data['jobTitle'] == null || data['jobTitle'] == '')) {
+                professionalMatch = false;
+              }
+
+              if (filterEducationLevel.isNotEmpty &&
+                  data['education'] != filterEducationLevel) {
+                professionalMatch = false;
+              }
+            }
+
+            // Apply multi-select filters (only if the filter has values)
+            bool relationshipGoalsMatch = filterRelationshipGoals.isEmpty ||
+                filterRelationshipGoals.contains(data['relationshipGoals']);
+
+            bool heightMatch = filterHeightPreferences.isEmpty ||
+                filterHeightPreferences.contains(data['height']);
+
+            bool zodiacMatch = filterZodiacSigns.isEmpty ||
+                filterZodiacSigns.contains(data['zodiacSign']);
+
+            bool familyPlansMatch = filterFamilyPlans.isEmpty ||
+                filterFamilyPlans.contains(data['familyPlans']);
+
+            bool personalityMatch = filterPersonalityTypes.isEmpty ||
+                filterPersonalityTypes.contains(data['personalityType']);
+
+            bool communicationMatch = filterCommunicationStyles.isEmpty ||
+                filterCommunicationStyles.contains(data['communicationStyle']);
+
+            bool loveLanguageMatch = filterLoveLanguages.isEmpty ||
+                filterLoveLanguages.contains(data['loveStyle']);
+
+            bool petMatch = filterPetPreferences.isEmpty ||
+                filterPetPreferences.contains(data['pets']);
+
+            bool drinkingMatch = filterDrinkingHabits.isEmpty ||
+                filterDrinkingHabits.contains(data['drinking']);
+
+            bool smokingMatch = filterSmokingHabits.isEmpty ||
+                filterSmokingHabits.contains(data['smoking']);
+
+            bool workoutMatch = filterWorkoutFrequency.isEmpty ||
+                filterWorkoutFrequency.contains(data['workout']);
+
+            bool dietMatch = filterDietaryPreferences.isEmpty ||
+                filterDietaryPreferences.contains(data['dietaryPreference']);
+
+            bool socialMediaMatch = filterSocialMediaUsage.isEmpty ||
+                filterSocialMediaUsage.contains(data['socialMedia']);
+
+            bool sleepingMatch = filterSleepingHabits.isEmpty ||
+                filterSleepingHabits.contains(data['sleepingHabits']);
+
+            // Language preferences
+            bool languageMatch = true;
+            if (filterLanguagePreferences.isNotEmpty) {
+              List<String> userLanguages = List<String>.from(data['languagesKnown'] ?? []);
+              // Check if user speaks ANY of the selected languages
+              languageMatch = filterLanguagePreferences.any((language) =>
+                  userLanguages.contains(language));
+            }
+
+            // All filters must match
+            if (ageMatch && genderMatch && distanceMatch &&
+                photoMatch && verifiedMatch && interestMatch &&
+                professionalMatch && relationshipGoalsMatch &&
+                heightMatch && zodiacMatch && familyPlansMatch &&
+                personalityMatch && communicationMatch && loveLanguageMatch &&
+                petMatch && drinkingMatch && smokingMatch && workoutMatch &&
+                dietMatch && socialMediaMatch && sleepingMatch && languageMatch) {
+
+              // Create user object
+              User user = User.fromFirestore(doc);
+              allUsers.add(user);
+              print('Added filtered user: ${user.name} (ID: ${user.id})');
+            }
           } catch (e) {
             print('Error parsing user data for $userId: $e');
           }
@@ -251,6 +413,32 @@ class FirestoreService {
     }
   }
 
+// Helper method to calculate distance between two GeoPoints
+  double calculateDistance(GeoPoint point1, GeoPoint point2) {
+    const double earthRadius = 6371; // Radius of the earth in km
+
+    // Convert latitude and longitude from degrees to radians
+    double lat1 = _degreesToRadians(point1.latitude);
+    double lon1 = _degreesToRadians(point1.longitude);
+    double lat2 = _degreesToRadians(point2.latitude);
+    double lon2 = _degreesToRadians(point2.longitude);
+
+    // Haversine formula
+    double dLat = lat2 - lat1;
+    double dLon = lon2 - lon1;
+    double a = sin(dLat/2) * sin(dLat/2) +
+        cos(lat1) * cos(lat2) *
+            sin(dLon/2) * sin(dLon/2);
+    double c = 2 * atan2(sqrt(a), sqrt(1-a));
+    double distance = earthRadius * c;
+
+    return distance;
+  }
+
+// Helper method to convert degrees to radians
+  double _degreesToRadians(double degrees) {
+    return degrees * (pi / 180);
+  }
   // Get users who have liked the current user
   Future<List<User>> getUsersWhoLikedMe() async {
     try {

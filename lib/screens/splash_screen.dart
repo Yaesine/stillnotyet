@@ -151,7 +151,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                   Opacity(
                     opacity: _opacityAnimation.value,
                     child: Text(
-                      'STILL',
+                      'Marifecto',
                       style: TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.bold,

@@ -150,6 +150,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
   }
 
+// Update the _savePreferences method in lib/screens/filters_screen.dart
+
   Future<void> _savePreferences() async {
     setState(() {
       _isLoading = true;
@@ -207,6 +209,10 @@ class _FiltersScreenState extends State<FiltersScreen> {
               backgroundColor: AppColors.success,
             ),
           );
+
+          // Reload potential matches with new filters
+          await userProvider.loadPotentialMatches();
+
           Navigator.of(context).pop();
         }
       }

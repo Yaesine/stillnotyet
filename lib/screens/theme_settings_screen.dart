@@ -304,7 +304,7 @@ class ThemeSettingsScreen extends StatelessWidget {
                 ),
                 const Spacer(),
                 Text(
-                  'STILL',
+                  'Marifecto',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

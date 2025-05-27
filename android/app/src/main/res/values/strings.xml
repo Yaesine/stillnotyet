@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Still</string>
+    <string name="app_name">Marifecto</string>
     <string name="facebook_app_id">709702088098722</string>
     <string name="fb_login_protocol_scheme">fb709702088098722</string>
     <string name="facebook_client_token">9ca071e45a8ec857ff44cea74fbd5ec3</string>

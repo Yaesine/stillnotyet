@@ -263,7 +263,7 @@ class _ModernLoginScreenState extends State<ModernLoginScreen> with SingleTicker
                         FadeInAnimation(
                           delay: const Duration(milliseconds: 500),
                           child: Text(
-                            'STILL',
+                            'Marifecto',
                             style: AppTextStyles.appLogo,
                           ),
                         ),

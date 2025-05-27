@@ -12,7 +12,7 @@
 
 
     <application
-        android:label="Still"
+        android:label="Marifecto"
         android:icon="@mipmap/ic_launcher"
         android:hardwareAccelerated="true"
         android:largeHeap="true"
