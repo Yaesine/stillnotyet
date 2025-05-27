@@ -4,7 +4,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:new_tinder_clone/providers/theme_provider.dart';
-import 'package:new_tinder_clone/screens/TinderStyleProfileScreen.dart';
+import 'package:new_tinder_clone/screens/StyleProfileScreen.dart';
 import 'package:new_tinder_clone/screens/help_support_screen.dart';
 import 'package:new_tinder_clone/screens/likes_screen.dart';
 import 'package:new_tinder_clone/screens/notifications_screen.dart';
@@ -190,7 +190,7 @@ class MyApp extends StatelessWidget {
                 '/filters': (context) => const FiltersScreen(),
                 '/boost': (context) => BoostScreen(),
                 '/premium': (context) => PremiumScreen(),
-                '/modernProfile': (context) => TinderStyleProfileScreen(),
+                '/modernProfile': (context) => StyleProfileScreen(),
                 '/achievements': (context) => AchievementsScreen(
                   unlockedBadges: [],
                   availableBadges: [],
@@ -227,7 +227,7 @@ class _MainScreenState extends State<MainScreen> {
     const ExploreScreen(),  // Add the new ExploreScreen here
     const LikesScreen(),
     const MatchesScreen(),
-    const TinderStyleProfileScreen(),
+    const StyleProfileScreen(),
   ];
 
   final PageController _pageController = PageController();

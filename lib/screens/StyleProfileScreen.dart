@@ -1,4 +1,4 @@
-// lib/screens/TinderStyleProfileScreen.dart
+// lib/screens/StyleProfileScreen.dart
 import 'dart:io';
 import 'dart:math';
 import 'package:flutter/cupertino.dart';
@@ -23,14 +23,14 @@ import 'help_support_screen.dart';
 import 'notifications_screen.dart';
 
 
-class TinderStyleProfileScreen extends StatefulWidget {
-  const TinderStyleProfileScreen({Key? key}) : super(key: key);
+class StyleProfileScreen extends StatefulWidget {
+  const StyleProfileScreen({Key? key}) : super(key: key);
 
   @override
-  _TinderStyleProfileScreenState createState() => _TinderStyleProfileScreenState();
+  _StyleProfileScreenState createState() => _StyleProfileScreenState();
 }
 
-class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> with SingleTickerProviderStateMixin {
+class _StyleProfileScreenState extends State<StyleProfileScreen> with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   String _errorMessage = '';
   int _profileCompletion = 0;
@@ -53,7 +53,7 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
     super.dispose();
   }
 
-  // Updated calculateProfileCompletion method for TinderStyleProfileScreen.dart
+  // Updated calculateProfileCompletion method for StyleProfileScreen.dart
 
   int calculateProfileCompletion(User user) {
     int completedFields = 0;
@@ -260,7 +260,7 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
     );
   }
 
-// Modified section for lib/screens/TinderStyleProfileScreen.dart
+// Modified section for lib/screens/StyleProfileScreen.dart
 
 // This is the updated _buildProfileHeader method that fixes the text overlap issue
   Widget _buildProfileHeader(User user, bool isDarkMode) {
