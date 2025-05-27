@@ -29,7 +29,11 @@ class _PremiumScreenState extends State<PremiumScreen> {
     // Apply promo code if passed to the screen
     if (widget.promoCode != null) {
       _promoController.text = widget.promoCode!;
-      _applyPromoCode();
+
+      // Use post-frame callback to ensure the widget is fully built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _applyPromoCode();
+      });
     }
   }
 
@@ -48,26 +52,32 @@ class _PremiumScreenState extends State<PremiumScreen> {
         _discountPercentage = 0.5; // 50% discount
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Success! 50% discount applied'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Only show SnackBar if the widget is fully built
+      if (WidgetsBinding.instance.isRootWidgetAttached) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Success! 50% discount applied'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } else if (code.isNotEmpty) {
       setState(() {
         _discountApplied = false;
         _discountPercentage = 0.0;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Invalid promo code'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      // Only show SnackBar if the widget is fully built
+      if (WidgetsBinding.instance.isRootWidgetAttached) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Invalid promo code'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -256,10 +266,13 @@ class _PremiumScreenState extends State<PremiumScreen> {
                           padding: const EdgeInsets.all(24.0),
                           child: SizedBox(
                             width: double.infinity,
-                            child: ElevatedButton(
+                            child:
+                            ElevatedButton(
                               onPressed: () {
+                                Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+
                                 // Implement subscription logic
-                                Navigator.pop(context);
+
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text('Subscription successful!'),
