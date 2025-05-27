@@ -364,53 +364,90 @@ class AppAuthProvider with ChangeNotifier {
   Future<String?> sendOtp(String phoneNumber, {bool useWhatsApp = false}) async {
     try {
       _errorMessage = null;
+      _isLoading = true;
       notifyListeners();
 
       print('Sending OTP to $phoneNumber via ${useWhatsApp ? "WhatsApp" : "SMS"}');
 
       if (useWhatsApp) {
+        // This is only a simulation for development purposes
         final simulatedOtp = '123456';
         print('Simulated WhatsApp OTP: $simulatedOtp');
         return 'whatsapp-verification-${DateTime.now().millisecondsSinceEpoch}';
       } else {
         Completer<String?> completer = Completer<String?>();
 
+        // Ensure the phone number is in E.164 format (includes + and country code)
+        if (!phoneNumber.startsWith('+')) {
+          phoneNumber = '+' + phoneNumber.replaceFirst(RegExp(r'^\+'), '');
+        }
+
         await FirebaseAuth.instance.verifyPhoneNumber(
           phoneNumber: phoneNumber,
-          timeout: const Duration(seconds: 60),
+          timeout: const Duration(seconds: 120), // Increased timeout
           verificationCompleted: (PhoneAuthCredential credential) async {
+            print('Auto-verification completed - usually happens on Android only');
             try {
+              _isLoading = true;
+              notifyListeners();
+
               final userCredential = await _auth.signInWithCredential(credential);
               final user = userCredential.user;
 
-              if (user != null && !completer.isCompleted) {
-                completer.complete('auto-verified');
+              if (user != null) {
+                await _firestoreService.createNewUser(
+                    user.uid,
+                    user.displayName ?? 'Phone User',
+                    user.phoneNumber ?? ''
+                );
+
+                await _notificationsService.saveTokenToDatabase(user.uid);
+
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('userId', user.uid);
+
+                _isLoading = false;
+                notifyListeners();
+
+                if (!completer.isCompleted) {
+                  completer.complete('auto-verified');
+                }
               }
-              notifyListeners();
             } catch (e) {
+              print('Error in auto-verification: $e');
+              _errorMessage = 'Verification error: ${e.toString()}';
+              _isLoading = false;
+              notifyListeners();
+
               if (!completer.isCompleted) {
                 completer.complete(null);
               }
-              _errorMessage = e.toString();
-              notifyListeners();
             }
           },
           verificationFailed: (FirebaseAuthException e) {
-            print('Phone verification failed: ${e.message}');
-            _errorMessage = e.message;
+            print('Phone verification failed: ${e.code} - ${e.message}');
+            _errorMessage = _getReadablePhoneAuthError(e);
+            _isLoading = false;
             notifyListeners();
+
             if (!completer.isCompleted) {
               completer.complete(null);
             }
           },
           codeSent: (String verificationId, int? resendToken) {
             print('SMS code sent to $phoneNumber, verification ID: $verificationId');
+            _isLoading = false;
+            notifyListeners();
+
             if (!completer.isCompleted) {
               completer.complete(verificationId);
             }
           },
           codeAutoRetrievalTimeout: (String verificationId) {
             print('Phone verification auto-retrieval timeout');
+            _isLoading = false;
+            notifyListeners();
+
             if (!completer.isCompleted) {
               completer.complete(verificationId);
             }
@@ -421,23 +458,49 @@ class AppAuthProvider with ChangeNotifier {
       }
     } catch (e) {
       print('Send OTP error: $e');
-      _errorMessage = e.toString();
+      _errorMessage = 'Error sending verification code: ${e.toString()}';
+      _isLoading = false;
       notifyListeners();
       return null;
     }
   }
 
+// Add this helper method to provide better error messages
+  String _getReadablePhoneAuthError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'invalid-phone-number':
+        return 'The phone number format is incorrect. Please enter a valid number with country code.';
+      case 'missing-phone-number':
+        return 'Please provide a phone number.';
+      case 'quota-exceeded':
+        return 'SMS quota exceeded. Please try again later.';
+      case 'user-disabled':
+        return 'This phone number has been disabled.';
+      case 'captcha-check-failed':
+        return 'reCAPTCHA verification failed. Please try again.';
+      case 'app-not-authorized':
+        return 'This app is not authorized to use Firebase Authentication.';
+      case 'network-request-failed':
+        return 'Network error. Please check your connection and try again.';
+      default:
+        return e.message ?? 'An error occurred during phone verification.';
+    }
+  }
   Future<bool> verifyOtp(String verificationId, String otp) async {
     try {
       _errorMessage = null;
+      _isLoading = true;
       notifyListeners();
 
       print('Verifying OTP: verification ID=$verificationId, OTP=$otp');
 
       if (verificationId.startsWith('whatsapp-verification-')) {
+        // This is a simulated WhatsApp verification
         if (otp.length == 6 && RegExp(r'^\d{6}$').hasMatch(otp)) {
           print('Simulated WhatsApp OTP verification successful');
 
+          // For development/testing only
+          // In production, use actual phone verification instead
           final userCredential = await _auth.signInAnonymously();
           final user = userCredential.user;
 
@@ -453,50 +516,68 @@ class AppAuthProvider with ChangeNotifier {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('userId', user.uid);
 
+            _isLoading = false;
             notifyListeners();
             return true;
           }
+          _isLoading = false;
+          notifyListeners();
           return false;
         } else {
           print('Invalid OTP format for WhatsApp verification');
-          _errorMessage = 'Invalid verification code';
+          _errorMessage = 'Invalid verification code. Please enter a 6-digit number.';
+          _isLoading = false;
           notifyListeners();
           return false;
         }
       } else {
-        PhoneAuthCredential credential = PhoneAuthProvider.credential(
-          verificationId: verificationId,
-          smsCode: otp,
-        );
-
-        UserCredential userCredential = await _auth.signInWithCredential(credential);
-        final user = userCredential.user;
-
-        if (user != null) {
-          await _firestoreService.createNewUser(
-              user.uid,
-              user.displayName ?? 'Phone User',
-              user.phoneNumber ?? ''
+        // Standard SMS verification
+        try {
+          PhoneAuthCredential credential = PhoneAuthProvider.credential(
+            verificationId: verificationId,
+            smsCode: otp,
           );
 
-          await _notificationsService.saveTokenToDatabase(user.uid);
+          UserCredential userCredential = await _auth.signInWithCredential(credential);
+          final user = userCredential.user;
 
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('userId', user.uid);
+          if (user != null) {
+            print('Phone verification successful for user ID: ${user.uid}');
 
+            await _firestoreService.createNewUser(
+                user.uid,
+                user.displayName ?? 'Phone User',
+                user.phoneNumber ?? ''
+            );
+
+            await _notificationsService.saveTokenToDatabase(user.uid);
+
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('userId', user.uid);
+
+            _isLoading = false;
+            notifyListeners();
+            return true;
+          }
+          _isLoading = false;
           notifyListeners();
-          return true;
+          return false;
+        } catch (e) {
+          print('Error verifying OTP: $e');
+          _errorMessage = 'Invalid verification code. Please check and try again.';
+          _isLoading = false;
+          notifyListeners();
+          return false;
         }
-        return false;
       }
     } catch (e) {
       print('Verify OTP error: $e');
-      _errorMessage = e.toString();
+      _errorMessage = 'Error verifying code: ${e.toString()}';
+      _isLoading = false;
       notifyListeners();
       return false;
     }
   }
-
   // Logout
   Future<void> logout() async {
     try {

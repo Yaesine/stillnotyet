@@ -38,8 +38,12 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     });
 
     try {
-      // Format phone number with country code
-      final phoneNumber = '$_selectedCountryCode${_phoneController.text.trim()}';
+      // Ensure proper E.164 format by cleaning any spaces or special characters
+      final phoneText = _phoneController.text.trim();
+      final cleanPhone = phoneText.replaceAll(RegExp(r'[^\d]'), '');
+      final phoneNumber = '$_selectedCountryCode$cleanPhone';
+
+      print('Attempting to send OTP to: $phoneNumber');
 
       // Get auth provider
       final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
@@ -69,9 +73,11 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
         }
       } else {
         if (mounted) {
+          // Show the specific error message from the provider
+          final errorMsg = authProvider.errorMessage ?? 'Failed to send OTP. Please try again.';
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Failed to send OTP. Please try again.'),
+            SnackBar(
+              content: Text(errorMsg),
               backgroundColor: Colors.red,
             ),
           );
@@ -92,7 +98,6 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       });
     }
   }
-
   Future<void> _verifyOtp() async {
     if (!_formKey.currentState!.validate() || _verificationId == null) return;
 
