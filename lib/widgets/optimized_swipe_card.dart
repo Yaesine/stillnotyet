@@ -533,6 +533,7 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
   }
 
   // New method to build the user info header with name, verified badge, and common interests
+  // Update the _buildUserInfoHeader method in lib/widgets/optimized_swipe_card.dart
   Widget _buildUserInfoHeader(BuildContext context) {
     final currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
 
@@ -547,8 +548,8 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Name with overflow handling
-        Expanded(
+        // Name and age - with constrained width
+        Flexible(
           child: Text(
             '${widget.user.name}, ${widget.user.age}',
             style: const TextStyle(
@@ -557,54 +558,60 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
               fontWeight: FontWeight.bold,
             ),
             overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        const SizedBox(width: 8),
-
-        // Verified badge
-        Container(
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.3),
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(
-            Icons.verified,
-            color: Colors.white,
-            size: 20,
+            maxLines: 1,
           ),
         ),
 
-        // Common interests badge if any exist
-        if (commonInterestsCount > 0) ...[
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.pink.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(12),
+        // Horizontal row of badges
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Verified badge
+            Container(
+              margin: const EdgeInsets.only(left: 8),
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.3),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.verified,
+                color: Colors.white,
+                size: 20,
+              ),
             ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.favorite,
-                  color: Colors.white,
-                  size: 14,
+
+            // Common interests badge if any exist
+            if (commonInterestsCount > 0)
+              Container(
+                margin: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.pink.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(width: 4),
-                Text(
-                  '$commonInterestsCount',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.favorite,
+                      color: Colors.white,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$commonInterestsCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ],
+              ),
+          ],
+        ),
       ],
     );
   }

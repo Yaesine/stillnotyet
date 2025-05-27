@@ -342,10 +342,11 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Wrap name in Expanded widget with overflow handling
+                    // Name, age and verified badge in a single row
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Expanded(
+                        Flexible(
                           child: Text(
                             '${user.name}, ${user.age}',
                             style: const TextStyle(
@@ -380,7 +381,7 @@ class _TinderStyleProfileScreenState extends State<TinderStyleProfileScreen> wit
                       ],
                     ),
                     const SizedBox(height: 4),
-                    // Wrap location text in a Row with Expanded to handle overflow
+                    // Location info remains unchanged
                     Row(
                       children: [
                         const Icon(
