@@ -282,6 +282,16 @@ class FirestoreService {
       Query usersQuery = _usersCollection.where(FieldPath.documentId, isNotEqualTo: currentUserId);
 
       // Apply gender filter if specified
+      // Fix gender filter terminology mismatch
+      if (lookingFor == 'Men') {
+        lookingFor = 'Male';
+      } else if (lookingFor == 'Women') {
+        lookingFor = 'Female';
+      }
+
+      print('Looking for gender: $lookingFor');
+
+// Apply gender filter if specified
       if (lookingFor.isNotEmpty) {
         usersQuery = usersQuery.where('gender', isEqualTo: lookingFor);
       }
