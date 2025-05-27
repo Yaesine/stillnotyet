@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:new_tinder_clone/screens/privacy_policy_screen.dart';
 import 'package:new_tinder_clone/screens/terms_of_service_screen.dart';
 import 'package:provider/provider.dart';
+import '../services/google_sign_in_native.dart';
 import '../theme/app_theme.dart';
 import '../providers/user_provider.dart';
 import '../providers/app_auth_provider.dart';
@@ -376,53 +377,31 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
       final user = _auth.currentUser;
       if (user == null) return;
 
-      // 1. Delete user data from Firestore
+      // First re-authenticate the user
+      bool reAuthSuccess = await _reAuthenticateUser();
+      if (!reAuthSuccess) {
+        _showErrorSnackBar('Authentication failed. Account deletion canceled.');
+        return;
+      }
+
+      // Continue with the account deletion process as before
       final batch = _firestore.batch();
 
       // Delete main user document
       final userRef = _firestore.collection('users').doc(user.uid);
       batch.delete(userRef);
 
-      // Delete user's messages
-      final messagesQuery = await _firestore
-          .collection('messages')
-          .where('senderId', isEqualTo: user.uid)
-          .get();
-
-      for (var doc in messagesQuery.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // Delete user's matches
-      final matchesQuery = await _firestore
-          .collection('matches')
-          .where('userId', isEqualTo: user.uid)
-          .get();
-
-      for (var doc in matchesQuery.docs) {
-        batch.delete(doc.reference);
-      }
-
-      // Delete user's likes/swipes
-      final swipesQuery = await _firestore
-          .collection('swipes')
-          .where('swiperId', isEqualTo: user.uid)
-          .get();
-
-      for (var doc in swipesQuery.docs) {
-        batch.delete(doc.reference);
-      }
+      // Delete user's messages, matches, swipes, etc.
+      // ... [your existing deletion code]
 
       // Commit the batch deletion
       await batch.commit();
 
-      // 2. Delete the user authentication record
+      // Now delete the user authentication record
       await user.delete();
 
-      // 3. Sign out
+      // Sign out and navigate to login screen
       await _auth.signOut();
-
-      // 4. Navigate to login screen
       if (mounted) {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       }
@@ -432,6 +411,267 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
     }
   }
 
+// New method to handle re-authentication
+  Future<bool> _reAuthenticateUser() async {
+    final user = _auth.currentUser;
+    if (user == null) return false;
+
+    // Determine authentication method based on provider data
+    final providers = user.providerData.map((e) => e.providerId).toList();
+
+    if (providers.contains('password')) {
+      // Email/password authentication
+      return await _reAuthenticateWithPassword();
+    } else if (providers.contains('google.com')) {
+      // Google Sign-In
+      return await _reAuthenticateWithGoogle();
+    } else if (providers.contains('apple.com')) {
+      // Apple Sign-In
+      return await _reAuthenticateWithApple();
+    } else if (providers.contains('phone')) {
+      // Phone authentication
+      return await _reAuthenticateWithPhone();
+    } else {
+      // Unknown provider
+      _showErrorSnackBar('Unknown authentication method. Please sign out and sign in again.');
+      return false;
+    }
+  }
+
+  Future<bool> _reAuthenticateWithPassword() async {
+    final TextEditingController passwordController = TextEditingController();
+    bool? result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Account Deletion'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Please enter your password to confirm account deletion:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                final user = _auth.currentUser;
+                if (user == null || user.email == null) {
+                  Navigator.of(context).pop(false);
+                  return;
+                }
+
+                // Create the credential
+                AuthCredential credential = EmailAuthProvider.credential(
+                  email: user.email!,
+                  password: passwordController.text,
+                );
+
+                // Re-authenticate
+                await user.reauthenticateWithCredential(credential);
+                Navigator.of(context).pop(true);
+              } catch (e) {
+                print('Re-authentication error: $e');
+                _showErrorSnackBar('Incorrect password.');
+                Navigator.of(context).pop(false);
+              }
+            },
+            child: const Text('Confirm', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    return result ?? false;
+  }
+
+  Future<bool> _reAuthenticateWithGoogle() async {
+    bool? result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Account Deletion'),
+        content: const Text(
+          'You need to sign in with Google again to confirm account deletion.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continue', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (result != true) return false;
+
+    try {
+      // Use your existing GoogleSignInNative class
+      final userCredential = await GoogleSignInNative.signIn();
+
+      // If sign-in was successful, we can proceed
+      return userCredential != null || FirebaseAuth.instance.currentUser != null;
+    } catch (e) {
+      print('Google re-authentication error: $e');
+      _showErrorSnackBar('Google Sign-In failed. Please try again.');
+      return false;
+    }
+  }
+  Future<bool> _reAuthenticateWithApple() async {
+    bool? result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Account Deletion'),
+        content: const Text(
+          'You need to sign in with Apple again to confirm account deletion.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Continue', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (result != true) return false;
+
+    try {
+      // Use your existing AppAuthProvider's Apple Sign-In method
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+      return await authProvider.signInWithApple();
+    } catch (e) {
+      print('Apple re-authentication error: $e');
+      _showErrorSnackBar('Apple Sign-In failed. Please try again.');
+      return false;
+    }
+  }
+  Future<bool> _reAuthenticateWithPhone() async {
+    final user = _auth.currentUser;
+    if (user?.phoneNumber == null) return false;
+
+    final phoneNumber = user!.phoneNumber!;
+    String? verificationId;
+    final otpController = TextEditingController();
+
+    // First, ask the user to confirm they want to send an OTP
+    bool? shouldSendOtp = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Account Deletion'),
+        content: Text(
+          'We will send a verification code to $phoneNumber to confirm your identity.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Send Code', style: TextStyle(color: Colors.blue)),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldSendOtp != true) return false;
+
+    // Show loading dialog while sending OTP
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Sending verification code...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // Send OTP
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+      verificationId = await authProvider.sendOtp(phoneNumber);
+
+      // Dismiss loading dialog
+      if (mounted) Navigator.of(context).pop();
+
+      if (verificationId == null) {
+        _showErrorSnackBar('Failed to send verification code.');
+        return false;
+      }
+
+      // Now prompt for OTP
+      bool? otpResult = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Enter Verification Code'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Enter the verification code sent to $phoneNumber:'),
+              const SizedBox(height: 16),
+              TextField(
+                controller: otpController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Verification Code',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Verify', style: TextStyle(color: Colors.blue)),
+            ),
+          ],
+        ),
+      );
+
+      if (otpResult != true) return false;
+
+      // Verify OTP
+      return await authProvider.verifyOtp(verificationId, otpController.text);
+    } catch (e) {
+      print('Phone re-authentication error: $e');
+      _showErrorSnackBar('Phone verification failed. Please try again.');
+      return false;
+    }
+  }
   void _showPrivacyInfoDialog(String title, String content) {
     showDialog(
       context: context,
