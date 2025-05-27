@@ -199,197 +199,38 @@ class FirestoreService {
         return [];
       }
 
-      print('Fetching potential matches with filters for $currentUserId');
+      print('==== GETTING ALL POTENTIAL MATCHES ====');
+      print('Current user ID: $currentUserId');
 
-      // First, get the current user's filter preferences
-      DocumentSnapshot userDoc = await _usersCollection.doc(currentUserId).get();
-      final userData = userDoc.data() as Map<String, dynamic>?;
+      // Simpler query: get ALL users except current user
+      QuerySnapshot usersSnapshot = await _usersCollection
+          .where(FieldPath.documentId, isNotEqualTo: currentUserId)
+          .limit(50)  // Increased limit to ensure we get enough users
+          .get();
 
-      if (userData == null) {
-        print('Unable to load user data for filter preferences');
-        return [];
-      }
+      print('Raw query returned ${usersSnapshot.docs.length} users');
 
-      // Extract filter preferences
-      final ageRangeStart = userData['ageRangeStart'] ?? 18;
-      final ageRangeEnd = userData['ageRangeEnd'] ?? 50;
-      final maxDistance = userData['distance'] ?? 100;
-      final lookingFor = userData['lookingFor'] ?? ''; // Gender preference
-
-      // Advanced filters
-      final showProfilesWithPhoto = userData['showProfilesWithPhoto'] ?? true;
-      final showVerifiedOnly = userData['showVerifiedOnly'] ?? false;
-      final selectedInterests = userData['prioritizedInterests'] as List<dynamic>? ?? [];
-
-      // Other filters
-      final filterByProfessional = userData['filterByProfessional'] ?? false;
-      final filterHasJobTitle = userData['filterHasJobTitle'] ?? false;
-      final filterEducationLevel = userData['filterEducationLevel'] ?? '';
-
-      // Multi-select filters
-      final filterRelationshipGoals = userData['filterRelationshipGoals'] as List<dynamic>? ?? [];
-      final filterHeightPreferences = userData['filterHeightPreferences'] as List<dynamic>? ?? [];
-      final filterZodiacSigns = userData['filterZodiacSigns'] as List<dynamic>? ?? [];
-      final filterFamilyPlans = userData['filterFamilyPlans'] as List<dynamic>? ?? [];
-      final filterPersonalityTypes = userData['filterPersonalityTypes'] as List<dynamic>? ?? [];
-      final filterCommunicationStyles = userData['filterCommunicationStyles'] as List<dynamic>? ?? [];
-      final filterLoveLanguages = userData['filterLoveLanguages'] as List<dynamic>? ?? [];
-      final filterPetPreferences = userData['filterPetPreferences'] as List<dynamic>? ?? [];
-      final filterDrinkingHabits = userData['filterDrinkingHabits'] as List<dynamic>? ?? [];
-      final filterSmokingHabits = userData['filterSmokingHabits'] as List<dynamic>? ?? [];
-      final filterWorkoutFrequency = userData['filterWorkoutFrequency'] as List<dynamic>? ?? [];
-      final filterDietaryPreferences = userData['filterDietaryPreferences'] as List<dynamic>? ?? [];
-      final filterSocialMediaUsage = userData['filterSocialMediaUsage'] as List<dynamic>? ?? [];
-      final filterSleepingHabits = userData['filterSleepingHabits'] as List<dynamic>? ?? [];
-      final filterLanguagePreferences = userData['filterLanguagePreferences'] as List<dynamic>? ?? [];
-
-      print('Applying filters: age=$ageRangeStart-$ageRangeEnd, distance=$maxDistance, lookingFor=$lookingFor');
-      print('Advanced filters: showProfilesWithPhoto=$showProfilesWithPhoto, showVerifiedOnly=$showVerifiedOnly');
-      print('Selected interests: $selectedInterests');
-
-      // Build basic query for all users except current user
-      QuerySnapshot usersSnapshot = await _usersCollection.get();
+      // Convert all users to User objects
       List<User> allUsers = [];
-
-      // Current user's geoPoint for distance calculation
-      GeoPoint? currentUserGeoPoint = userData['geoPoint'] as GeoPoint?;
-
-      print('Found ${usersSnapshot.docs.length} total users in database');
-
-      // Filter users based on criteria
       for (var doc in usersSnapshot.docs) {
-        String userId = doc.id;
-        if (userId != currentUserId) {
-          try {
-            Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        try {
+          Map<String, dynamic> userData = doc.data() as Map<String, dynamic>;
+          print('Processing user: ${doc.id} - ${userData['name']}');
 
-            // Basic filters
-            int userAge = data['age'] ?? 0;
-            bool ageMatch = userAge >= ageRangeStart && userAge <= ageRangeEnd;
-
-            // Gender filter
-            bool genderMatch = lookingFor.isEmpty || data['gender'] == lookingFor;
-
-            // Distance filter
-            bool distanceMatch = true;
-            if (currentUserGeoPoint != null && data['geoPoint'] != null) {
-              // Use the LocationService to calculate distance
-              double distance = calculateDistance(
-                  currentUserGeoPoint,
-                  data['geoPoint'] as GeoPoint
-              );
-              distanceMatch = distance <= maxDistance;
-            }
-
-            // Photo filter
-            bool photoMatch = !showProfilesWithPhoto ||
-                (data['imageUrls'] != null && (data['imageUrls'] as List).isNotEmpty);
-
-            // Verified filter - assuming there's a 'verified' field
-            bool verifiedMatch = !showVerifiedOnly || (data['verified'] == true);
-
-            // Interest filter
-            bool interestMatch = true;
-            if (selectedInterests.isNotEmpty) {
-              List<String> userInterests = List<String>.from(data['interests'] ?? []);
-              // Check if user has ANY of the selected interests
-              interestMatch = selectedInterests.any((interest) =>
-                  userInterests.contains(interest));
-            }
-
-            // Apply professional filters
-            bool professionalMatch = true;
-            if (filterByProfessional) {
-              if (filterHasJobTitle && (data['jobTitle'] == null || data['jobTitle'] == '')) {
-                professionalMatch = false;
-              }
-
-              if (filterEducationLevel.isNotEmpty &&
-                  data['education'] != filterEducationLevel) {
-                professionalMatch = false;
-              }
-            }
-
-            // Apply multi-select filters (only if the filter has values)
-            bool relationshipGoalsMatch = filterRelationshipGoals.isEmpty ||
-                filterRelationshipGoals.contains(data['relationshipGoals']);
-
-            bool heightMatch = filterHeightPreferences.isEmpty ||
-                filterHeightPreferences.contains(data['height']);
-
-            bool zodiacMatch = filterZodiacSigns.isEmpty ||
-                filterZodiacSigns.contains(data['zodiacSign']);
-
-            bool familyPlansMatch = filterFamilyPlans.isEmpty ||
-                filterFamilyPlans.contains(data['familyPlans']);
-
-            bool personalityMatch = filterPersonalityTypes.isEmpty ||
-                filterPersonalityTypes.contains(data['personalityType']);
-
-            bool communicationMatch = filterCommunicationStyles.isEmpty ||
-                filterCommunicationStyles.contains(data['communicationStyle']);
-
-            bool loveLanguageMatch = filterLoveLanguages.isEmpty ||
-                filterLoveLanguages.contains(data['loveStyle']);
-
-            bool petMatch = filterPetPreferences.isEmpty ||
-                filterPetPreferences.contains(data['pets']);
-
-            bool drinkingMatch = filterDrinkingHabits.isEmpty ||
-                filterDrinkingHabits.contains(data['drinking']);
-
-            bool smokingMatch = filterSmokingHabits.isEmpty ||
-                filterSmokingHabits.contains(data['smoking']);
-
-            bool workoutMatch = filterWorkoutFrequency.isEmpty ||
-                filterWorkoutFrequency.contains(data['workout']);
-
-            bool dietMatch = filterDietaryPreferences.isEmpty ||
-                filterDietaryPreferences.contains(data['dietaryPreference']);
-
-            bool socialMediaMatch = filterSocialMediaUsage.isEmpty ||
-                filterSocialMediaUsage.contains(data['socialMedia']);
-
-            bool sleepingMatch = filterSleepingHabits.isEmpty ||
-                filterSleepingHabits.contains(data['sleepingHabits']);
-
-            // Language preferences
-            bool languageMatch = true;
-            if (filterLanguagePreferences.isNotEmpty) {
-              List<String> userLanguages = List<String>.from(data['languagesKnown'] ?? []);
-              // Check if user speaks ANY of the selected languages
-              languageMatch = filterLanguagePreferences.any((language) =>
-                  userLanguages.contains(language));
-            }
-
-            // All filters must match
-            if (ageMatch && genderMatch && distanceMatch &&
-                photoMatch && verifiedMatch && interestMatch &&
-                professionalMatch && relationshipGoalsMatch &&
-                heightMatch && zodiacMatch && familyPlansMatch &&
-                personalityMatch && communicationMatch && loveLanguageMatch &&
-                petMatch && drinkingMatch && smokingMatch && workoutMatch &&
-                dietMatch && socialMediaMatch && sleepingMatch && languageMatch) {
-
-              // Create user object
-              User user = User.fromFirestore(doc);
-              allUsers.add(user);
-              print('Added filtered user: ${user.name} (ID: ${user.id})');
-            }
-          } catch (e) {
-            print('Error parsing user data for $userId: $e');
-          }
+          User user = User.fromFirestore(doc);
+          allUsers.add(user);
+        } catch (e) {
+          print('Error parsing user ${doc.id}: $e');
         }
       }
 
-      // Get all swipes by current user
+      print('Successfully parsed ${allUsers.length} users');
+
+      // Get users the current user has already swiped on
       QuerySnapshot swipesSnapshot = await _swipesCollection
           .where('swiperId', isEqualTo: currentUserId)
           .get();
 
-      print('User has ${swipesSnapshot.docs.length} swipe records');
-
-      // Extract swiped user IDs
       List<String> swipedUserIds = [];
       for (var doc in swipesSnapshot.docs) {
         try {
@@ -400,16 +241,32 @@ class FirestoreService {
         }
       }
 
-      // Filter out users that have already been swiped
-      List<User> potentialMatches = allUsers.where((user) =>
-      !swipedUserIds.contains(user.id)).toList();
+      print('User has already swiped on ${swipedUserIds.length} users');
 
-      print('After filtering, found ${potentialMatches.length} potential matches');
+      // Filter out users already swiped
+      List<User> potentialMatches = allUsers
+          .where((user) => !swipedUserIds.contains(user.id))
+          .toList();
+
+      print('FINAL RESULT: ${potentialMatches.length} potential matches');
+      // Print each match for debugging
+      for (var user in potentialMatches) {
+        print('- Match: ${user.name} (ID: ${user.id})');
+      }
 
       return potentialMatches;
     } catch (e) {
-      print('Error getting potential matches from Firestore: $e');
-      throw e;
+      print('Error getting potential matches: $e');
+      return [];
+    }
+  }
+  Future<int> getUserCount() async {
+    try {
+      QuerySnapshot snapshot = await _usersCollection.get();
+      return snapshot.docs.length;
+    } catch (e) {
+      print('Error getting user count: $e');
+      return 0;
     }
   }
 

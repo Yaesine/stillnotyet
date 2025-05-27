@@ -167,90 +167,38 @@ class UserProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      print('==== LOADING POTENTIAL MATCHES ====');
-      print('Current user ID: ${_firestoreService.currentUserId}');
+      print('===== LOADING POTENTIAL MATCHES =====');
 
       if (_firestoreService.currentUserId == null) {
         print('ERROR: No current user ID available');
         throw Exception('No current user ID available');
       }
 
-      print('Attempting to load potential matches from Firestore with filters applied...');
+      // Force refresh of test users to ensure some users exist
+      await _firestoreService.createTestUsersIfNeeded();
+
+      // Get all potential matches with minimal filtering
       _potentialMatches = await _firestoreService.getPotentialMatches();
+
       print('Loaded ${_potentialMatches.length} potential matches from Firestore');
 
-      // Print each potential match for debugging
-      if (_potentialMatches.isNotEmpty) {
-        print('Potential matches:');
-        for (var match in _potentialMatches) {
-          print('- User: ${match.name} (ID: ${match.id}, Age: ${match.age})');
-        }
-      }
-
-      // Only use dummy data if Firebase returned no results and we're in development mode
-      if (_potentialMatches.isEmpty && const bool.fromEnvironment('dart.vm.product') == false) {
-        print('No potential matches found in Firestore, using remote dummy data');
-
-        // Use async method to fetch remote dummy data
+      // ONLY use dummy data if absolutely no matches were found
+      if (_potentialMatches.isEmpty) {
+        print('WARNING: No potential matches found in Firestore, using remote dummy data');
         _potentialMatches = await DummyData.getDummyUsersAsync();
-        print('Loaded ${_potentialMatches.length} potential matches from remote data');
-
-        // Apply basic filtering to dummy data as well
-        if (_currentUser != null) {
-          // Filter dummy data by age
-          _potentialMatches = _potentialMatches.where((user) {
-            return user.age >= _currentUser!.ageRangeStart &&
-                user.age <= _currentUser!.ageRangeEnd;
-          }).toList();
-
-          // Filter by gender if looking for specific gender
-          if (_currentUser!.lookingFor.isNotEmpty) {
-            _potentialMatches = _potentialMatches.where((user) {
-              return user.gender == _currentUser!.lookingFor;
-            }).toList();
-          }
-
-          print('After filtering: ${_potentialMatches.length} potential matches');
-        }
       }
     } catch (e) {
       _errorMessage = 'Failed to load potential matches: $e';
       print('ERROR loading potential matches: $e');
 
-      // Fall back to dummy data on error in development mode
-      if (const bool.fromEnvironment('dart.vm.product') == false) {
-        print('Falling back to remote dummy data due to error');
-
-        try {
-          // Use async method to fetch remote dummy data
-          _potentialMatches = await DummyData.getDummyUsersAsync();
-          print('Loaded ${_potentialMatches.length} fallback matches from remote data');
-
-          // Apply basic filtering to dummy data
-          if (_currentUser != null) {
-            // Filter dummy data by age and gender
-            _potentialMatches = _potentialMatches.where((user) {
-              bool ageMatch = user.age >= _currentUser!.ageRangeStart &&
-                  user.age <= _currentUser!.ageRangeEnd;
-              bool genderMatch = _currentUser!.lookingFor.isEmpty ||
-                  user.gender == _currentUser!.lookingFor;
-              return ageMatch && genderMatch;
-            }).toList();
-
-            print('After filtering: ${_potentialMatches.length} fallback matches');
-          }
-        } catch (fallbackError) {
-          print('Error loading fallback data: $fallbackError');
-          _potentialMatches = []; // Empty list as last resort
-        }
-      }
+      // Only use dummy data if there was an error
+      _potentialMatches = await DummyData.getDummyUsersAsync();
     } finally {
       _isLoading = false;
       notifyListeners();
-      print('==== FINISHED LOADING POTENTIAL MATCHES ====');
+      print('===== FINISHED LOADING POTENTIAL MATCHES =====');
     }
-  }  // Load users who have liked the current user
-  Future<void> loadUsersWhoLikedMe() async {
+  }  Future<void> loadUsersWhoLikedMe() async {
     _isLoading = true;
     notifyListeners();
 
