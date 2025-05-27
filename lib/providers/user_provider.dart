@@ -177,7 +177,7 @@ class UserProvider with ChangeNotifier {
 
       print('Attempting to load potential matches from Firestore with filters applied...');
       _potentialMatches = await _firestoreService.getPotentialMatches();
-      print('Loaded ${_potentialMatches.length} potential matches');
+      print('Loaded ${_potentialMatches.length} potential matches from Firestore');
 
       // Print each potential match for debugging
       if (_potentialMatches.isNotEmpty) {
@@ -189,8 +189,11 @@ class UserProvider with ChangeNotifier {
 
       // Only use dummy data if Firebase returned no results and we're in development mode
       if (_potentialMatches.isEmpty && const bool.fromEnvironment('dart.vm.product') == false) {
-        print('No potential matches found in Firestore, using dummy data');
-        _potentialMatches = DummyData.getDummyUsers();
+        print('No potential matches found in Firestore, using remote dummy data');
+
+        // Use async method to fetch remote dummy data
+        _potentialMatches = await DummyData.getDummyUsersAsync();
+        print('Loaded ${_potentialMatches.length} potential matches from remote data');
 
         // Apply basic filtering to dummy data as well
         if (_currentUser != null) {
@@ -206,26 +209,39 @@ class UserProvider with ChangeNotifier {
               return user.gender == _currentUser!.lookingFor;
             }).toList();
           }
+
+          print('After filtering: ${_potentialMatches.length} potential matches');
         }
       }
     } catch (e) {
       _errorMessage = 'Failed to load potential matches: $e';
       print('ERROR loading potential matches: $e');
+
       // Fall back to dummy data on error in development mode
       if (const bool.fromEnvironment('dart.vm.product') == false) {
-        print('Falling back to dummy data due to error');
-        _potentialMatches = DummyData.getDummyUsers();
+        print('Falling back to remote dummy data due to error');
 
-        // Apply basic filtering to dummy data
-        if (_currentUser != null) {
-          // Filter dummy data by age and gender (as above)
-          _potentialMatches = _potentialMatches.where((user) {
-            bool ageMatch = user.age >= _currentUser!.ageRangeStart &&
-                user.age <= _currentUser!.ageRangeEnd;
-            bool genderMatch = _currentUser!.lookingFor.isEmpty ||
-                user.gender == _currentUser!.lookingFor;
-            return ageMatch && genderMatch;
-          }).toList();
+        try {
+          // Use async method to fetch remote dummy data
+          _potentialMatches = await DummyData.getDummyUsersAsync();
+          print('Loaded ${_potentialMatches.length} fallback matches from remote data');
+
+          // Apply basic filtering to dummy data
+          if (_currentUser != null) {
+            // Filter dummy data by age and gender
+            _potentialMatches = _potentialMatches.where((user) {
+              bool ageMatch = user.age >= _currentUser!.ageRangeStart &&
+                  user.age <= _currentUser!.ageRangeEnd;
+              bool genderMatch = _currentUser!.lookingFor.isEmpty ||
+                  user.gender == _currentUser!.lookingFor;
+              return ageMatch && genderMatch;
+            }).toList();
+
+            print('After filtering: ${_potentialMatches.length} fallback matches');
+          }
+        } catch (fallbackError) {
+          print('Error loading fallback data: $fallbackError');
+          _potentialMatches = []; // Empty list as last resort
         }
       }
     } finally {
@@ -233,8 +249,7 @@ class UserProvider with ChangeNotifier {
       notifyListeners();
       print('==== FINISHED LOADING POTENTIAL MATCHES ====');
     }
-  }
-  // Load users who have liked the current user
+  }  // Load users who have liked the current user
   Future<void> loadUsersWhoLikedMe() async {
     _isLoading = true;
     notifyListeners();
@@ -293,23 +308,27 @@ class UserProvider with ChangeNotifier {
       if (existingUser == null) {
         print('User document does not exist in Firestore. Creating it now...');
 
+        // Try to get a dummy user first from remote data
+        User? dummyUser = await DummyData.getCurrentUserAsync();
+
         // Get user's name from Firebase Auth
-        final userName = authInstance.currentUser?.displayName ?? 'New User';
+        final userName = authInstance.currentUser?.displayName ??
+            (dummyUser?.name ?? 'New User');
 
         // Create basic profile - without any default profile image
         User newUser = User(
           id: userId,
           name: userName,
-          age: 25,
-          bio: 'Tell others about yourself...',
+          age: dummyUser?.age ?? 25,
+          bio: dummyUser?.bio ?? 'Tell others about yourself...',
           imageUrls: [], // Empty array - we won't add any default image
-          interests: ['Travel', 'Music', 'Movies'],
-          location: 'New York, NY',
-          gender: '',
-          lookingFor: '',
-          distance: 50,
-          ageRangeStart: 18,
-          ageRangeEnd: 50,
+          interests: dummyUser?.interests ?? ['Travel', 'Music', 'Movies'],
+          location: dummyUser?.location ?? 'Abu Dhabi, UAE',
+          gender: dummyUser?.gender ?? '',
+          lookingFor: dummyUser?.lookingFor ?? '',
+          distance: dummyUser?.distance ?? 50,
+          ageRangeStart: dummyUser?.ageRangeStart ?? 18,
+          ageRangeEnd: dummyUser?.ageRangeEnd ?? 50,
         );
 
         // Use the update method from FirestoreService
@@ -328,7 +347,6 @@ class UserProvider with ChangeNotifier {
       print('Error in forceSyncCurrentUser: $e');
     }
   }
-
   // Load user matches
   Future<void> loadMatches() async {
     _isLoading = true;
@@ -337,17 +355,56 @@ class UserProvider with ChangeNotifier {
 
     try {
       _matches = await _firestoreService.getUserMatches();
+      print('Loaded ${_matches.length} matches from Firestore');
+
+      // If no matches found in Firestore, use dummy matches in development mode
+      if (_matches.isEmpty && const bool.fromEnvironment('dart.vm.product') == false) {
+        print('No matches found in Firestore, using remote dummy data');
+
+        // Use async method to fetch remote dummy data
+        _matches = await DummyData.getDummyMatchesAsync();
+        print('Loaded ${_matches.length} matches from remote data');
+      }
+
       _matchedUsers = await _firestoreService.getMatchedUsers();
-      print('Loaded ${_matches.length} matches and ${_matchedUsers.length} matched users');
+      print('Loaded ${_matchedUsers.length} matched users');
+
     } catch (e) {
       _errorMessage = 'Failed to load matches: $e';
       print('Error loading matches: $e');
+
+      // Fall back to dummy matches on error in development mode
+      if (const bool.fromEnvironment('dart.vm.product') == false) {
+        print('Falling back to remote dummy matches due to error');
+
+        try {
+          // Use async method to fetch remote dummy data
+          _matches = await DummyData.getDummyMatchesAsync();
+          print('Loaded ${_matches.length} fallback matches from remote data');
+
+          // Try to load matched users for these matches
+          List<User> fallbackMatchedUsers = [];
+          for (var match in _matches) {
+            User? matchedUser = await DummyData.getUserByIdAsync(match.matchedUserId);
+            if (matchedUser != null) {
+              fallbackMatchedUsers.add(matchedUser);
+            }
+          }
+
+          _matchedUsers = fallbackMatchedUsers;
+          print('Loaded ${_matchedUsers.length} fallback matched users');
+
+        } catch (fallbackError) {
+          print('Error loading fallback match data: $fallbackError');
+          _matches = []; // Empty list as last resort
+          _matchedUsers = [];
+        }
+      }
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
-
   // Swipe left (dislike)
   Future<void> swipeLeft(String userId) async {
     try {
