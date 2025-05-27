@@ -469,6 +469,7 @@ class AppAuthProvider with ChangeNotifier {
   }
 
 // Add this helper method to provide better error messages
+// Update the _getReadablePhoneAuthError method in lib/providers/app_auth_provider.dart
   String _getReadablePhoneAuthError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-phone-number':
@@ -476,7 +477,7 @@ class AppAuthProvider with ChangeNotifier {
       case 'missing-phone-number':
         return 'Please provide a phone number.';
       case 'quota-exceeded':
-        return 'SMS quota exceeded. Please try again later.';
+        return 'SMS quota exceeded. Please try again later or use WhatsApp verification.';
       case 'user-disabled':
         return 'This phone number has been disabled.';
       case 'captcha-check-failed':
@@ -485,6 +486,8 @@ class AppAuthProvider with ChangeNotifier {
         return 'This app is not authorized to use Firebase Authentication.';
       case 'network-request-failed':
         return 'Network error. Please check your connection and try again.';
+      case 'too-many-requests':
+        return 'Too many verification attempts. For security reasons, please wait 1 hour and try again, or use WhatsApp verification instead.';
       default:
         return e.message ?? 'An error occurred during phone verification.';
     }

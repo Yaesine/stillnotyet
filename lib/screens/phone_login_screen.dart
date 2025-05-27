@@ -78,12 +78,35 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
         if (mounted) {
           // Show the specific error message from the provider
           final errorMsg = authProvider.errorMessage ?? 'Failed to send OTP. Please try again.';
+
+          // Check if it's a rate limit error
+          final isRateLimitError = errorMsg.contains('too many') ||
+              errorMsg.contains('blocked') ||
+              errorMsg.contains('unusual activity');
+
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(errorMsg),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+              action: isRateLimitError ? SnackBarAction(
+                label: 'Try WhatsApp',
+                onPressed: () {
+                  setState(() {
+                    _useWhatsApp = true;
+                    _isLoading = false;
+                  });
+                },
+              ) : null,
             ),
           );
+
+          // If it's a rate limit error, show the WhatsApp option more prominently
+          if (isRateLimitError) {
+            setState(() {
+              _showWhatsAppBanner = true;
+            });
+          }
         }
       }
     } catch (e) {
@@ -101,6 +124,64 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
       });
     }
   }
+
+  bool _showWhatsAppBanner = false;
+
+  Widget _buildWhatsAppBanner() {
+    if (!_showWhatsAppBanner) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.green),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.warning_amber_rounded, color: Colors.green),
+              SizedBox(width: 8),
+              Text(
+                'SMS Verification Unavailable',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Due to security limits, SMS verification is temporarily unavailable. Please use WhatsApp verification instead.',
+            style: TextStyle(fontSize: 14),
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: () {
+              setState(() {
+                _useWhatsApp = true;
+                _showWhatsAppBanner = false;
+              });
+            },
+            icon: const Icon(Icons.message, color: Colors.white),
+            label: const Text('Use WhatsApp Verification'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
+
+
   Future<void> _verifyOtp() async {
     if (!_formKey.currentState!.validate() || _verificationId == null) return;
 
@@ -274,23 +355,29 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
                     ),
 
                     // WhatsApp option
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _useWhatsApp,
-                          activeColor: AppColors.primary,
-                          onChanged: (value) {
-                            setState(() {
-                              _useWhatsApp = value ?? false;
-                            });
-                          },
-                        ),
-                        const Text(
-                          'Send code via WhatsApp instead of SMS',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                      ],
-                    ),
+                    if (!_isOtpSent) ...[
+                      // WhatsApp option toggle
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _useWhatsApp,
+                            activeColor: AppColors.primary,
+                            onChanged: (value) {
+                              setState(() {
+                                _useWhatsApp = value ?? false;
+                              });
+                            },
+                          ),
+                          const Text(
+                            'Send code via WhatsApp instead of SMS',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ],
+                      ),
+
+                      // Show WhatsApp banner if needed
+                      _buildWhatsAppBanner(),
+                    ]
                   ],
                 )
               else
