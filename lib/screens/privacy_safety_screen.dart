@@ -3,6 +3,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:new_tinder_clone/screens/premium_screen.dart';
 import 'package:new_tinder_clone/screens/privacy_policy_screen.dart';
 import 'package:new_tinder_clone/screens/terms_of_service_screen.dart';
 import 'package:provider/provider.dart';
@@ -377,38 +378,259 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
       final user = _auth.currentUser;
       if (user == null) return;
 
-      // First re-authenticate the user
+      // First show retention offer dialog
+      bool continueWithDeletion = await _showRetentionOfferDialog();
+      if (!continueWithDeletion) {
+        return; // User canceled deletion or accepted the offer
+      }
+
+      // Then re-authenticate the user
       bool reAuthSuccess = await _reAuthenticateUser();
       if (!reAuthSuccess) {
         _showErrorSnackBar('Authentication failed. Account deletion canceled.');
         return;
       }
 
-      // Continue with the account deletion process as before
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Deleting account...'),
+            ],
+          ),
+        ),
+      );
+
+      // Continue with account deletion process
       final batch = _firestore.batch();
 
       // Delete main user document
       final userRef = _firestore.collection('users').doc(user.uid);
       batch.delete(userRef);
 
-      // Delete user's messages, matches, swipes, etc.
-      // ... [your existing deletion code]
+      // Delete user's messages
+      final messagesQuery = await _firestore
+          .collection('messages')
+          .where('senderId', isEqualTo: user.uid)
+          .get();
+
+      for (var doc in messagesQuery.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // Delete user's matches
+      final matchesQuery = await _firestore
+          .collection('matches')
+          .where('userId', isEqualTo: user.uid)
+          .get();
+
+      for (var doc in matchesQuery.docs) {
+        batch.delete(doc.reference);
+      }
+
+      // Delete user's likes/swipes
+      final swipesQuery = await _firestore
+          .collection('swipes')
+          .where('swiperId', isEqualTo: user.uid)
+          .get();
+
+      for (var doc in swipesQuery.docs) {
+        batch.delete(doc.reference);
+      }
 
       // Commit the batch deletion
       await batch.commit();
 
-      // Now delete the user authentication record
+      // Delete the user authentication record
       await user.delete();
 
-      // Sign out and navigate to login screen
+      // Sign out
       await _auth.signOut();
+
+      // Close loading dialog and navigate to login screen
       if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
       }
     } catch (e) {
+      // Close loading dialog if open
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+
       print('Error deleting account: $e');
       _showErrorSnackBar('Error deleting account: ${e.toString()}');
     }
+  }
+
+// Show retention offer dialog
+  Future<bool> _showRetentionOfferDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.purple.shade400,
+                  Colors.purple.shade800,
+                ],
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.workspace_premium,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Wait! We have a special offer',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Before you go, get 50% OFF Premium!',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.local_offer, color: Colors.purple),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Marifecto50',
+                        style: TextStyle(
+                          color: Colors.purple.shade800,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Use this coupon code at checkout to get 50% off any premium plan. Limited time offer!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                // Accept offer button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context, false); // Close dialog
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => PremiumScreen(
+                            promoCode: 'Marifecto50',
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.purple.shade800,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Get 50% Off Premium',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Continue with deletion button
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text(
+                    'No thanks, continue with deletion',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                // Cancel button
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    ) ?? false; // Default to false if dialog is dismissed
   }
 
 // New method to handle re-authentication
