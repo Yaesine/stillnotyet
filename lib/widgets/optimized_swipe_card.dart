@@ -1,4 +1,5 @@
-// lib/widgets/optimized_swipe_card.dart
+// lib/widgets/optimized_swipe_card.dart - Update to reposition common interests
+
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
@@ -278,7 +279,7 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
 
                         // Swipe indicators
                         if (widget.isTop)
-                          _buildFilterMatchIndicators(widget.user, context),
+                          _buildSwipeIndicator(),
 
                         // User info with gradient overlay
                         Positioned(
@@ -306,35 +307,9 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            '${widget.user.name}, ${widget.user.age}',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 28,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.withOpacity(0.3),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: const Icon(
-                                            Icons.verified,
-                                            color: Colors.white,
-                                            size: 20,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
+                                    // User name, verified badge and common interests row
+                                    _buildUserInfoHeader(context),
+
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
@@ -557,139 +532,84 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
     );
   }
 
-  Widget _buildFilterMatchIndicators(User user, BuildContext context) {
+  // New method to build the user info header with name, verified badge, and common interests
+  Widget _buildUserInfoHeader(BuildContext context) {
     final currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
-    if (currentUser == null) return const SizedBox.shrink();
-
-    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final indicators = <Widget>[];
 
     // Check for matching interests
-    if (currentUser.interests.isNotEmpty && user.interests.isNotEmpty) {
-      final commonInterests = user.interests.where((interest) =>
+    int commonInterestsCount = 0;
+    if (currentUser != null && currentUser.interests.isNotEmpty && widget.user.interests.isNotEmpty) {
+      final commonInterests = widget.user.interests.where((interest) =>
           currentUser.interests.contains(interest)).toList();
-
-      if (commonInterests.isNotEmpty) {
-        indicators.add(
-          _buildMatchChip(
-            icon: Icons.favorite,
-            text: '${commonInterests.length} Common ${commonInterests.length == 1 ? 'Interest' : 'Interests'}',
-            color: Colors.pink,
-            isDarkMode: isDarkMode,
-          ),
-        );
-      }
+      commonInterestsCount = commonInterests.length;
     }
 
-    // Check for common languages
-    if (currentUser.languagesKnown.isNotEmpty && user.languagesKnown.isNotEmpty) {
-      final commonLanguages = user.languagesKnown.where((lang) =>
-          currentUser.languagesKnown.contains(lang)).toList();
-
-      if (commonLanguages.isNotEmpty) {
-        indicators.add(
-          _buildMatchChip(
-            icon: Icons.language,
-            text: '${commonLanguages.length} Common ${commonLanguages.length == 1 ? 'Language' : 'Languages'}',
-            color: Colors.blue,
-            isDarkMode: isDarkMode,
-          ),
-        );
-      }
-    }
-
-    // Check for matching relationship goals
-    if (currentUser.relationshipGoals.isNotEmpty &&
-        user.relationshipGoals == currentUser.relationshipGoals) {
-      indicators.add(
-        _buildMatchChip(
-          icon: Icons.favorite_border,
-          text: 'Same Goals',
-          color: Colors.red,
-          isDarkMode: isDarkMode,
-        ),
-      );
-    }
-
-    // Check for proximity if distance is available
-    if (user.distance <= 10) {
-      indicators.add(
-        _buildMatchChip(
-          icon: Icons.place,
-          text: 'Nearby',
-          color: Colors.green,
-          isDarkMode: isDarkMode,
-        ),
-      );
-    }
-
-    if (indicators.isEmpty) return const SizedBox.shrink();
-
-    return Positioned(
-      top: 70,
-      left: 0,
-      right: 0,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Wrap(
-          alignment: WrapAlignment.center,
-          spacing: 8,
-          runSpacing: 8,
-          children: indicators,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMatchChip({
-    required IconData icon,
-    required String text,
-    required Color color,
-    required bool isDarkMode,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: isDarkMode
-            ? color.withOpacity(0.3)
-            : color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withOpacity(0.5),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isDarkMode ? Colors.white : color,
-            size: 14,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: TextStyle(
-              color: isDarkMode ? Colors.white : color,
-              fontSize: 12,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Name with overflow handling
+        Expanded(
+          child: Text(
+            '${widget.user.name}, ${widget.user.age}',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        const SizedBox(width: 8),
+
+        // Verified badge
+        Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.verified,
+            color: Colors.white,
+            size: 20,
+          ),
+        ),
+
+        // Common interests badge if any exist
+        if (commonInterestsCount > 0) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.pink.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.favorite,
+                  color: Colors.white,
+                  size: 14,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '$commonInterestsCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
-      ),
+      ],
     );
   }
 
-
-
+  // Keep the existing methods for other functionality (moved this one here)
   Widget _buildSwipeIndicator() {
     // Handle horizontal swipe indicators
     if (_dragOffset.abs() > 20 && !_isVerticalDrag) {
@@ -784,6 +704,7 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
     return const SizedBox.shrink();
   }
 
+  // Keep all other methods (handleDragUpdate, handleDragEnd, etc.)
   void _handleDragUpdate(DragUpdateDetails details) {
     // Cancel any running animations
     if (_animationController.isAnimating) {
