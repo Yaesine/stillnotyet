@@ -367,95 +367,98 @@ class AppAuthProvider with ChangeNotifier {
       _isLoading = true;
       notifyListeners();
 
-      print('Sending OTP to $phoneNumber via ${useWhatsApp ? "WhatsApp" : "SMS"}');
+      print('Attempting to send OTP to: $phoneNumber');
 
+      // For WhatsApp simulation (development purposes only)
       if (useWhatsApp) {
-        // This is only a simulation for development purposes
         final simulatedOtp = '123456';
         print('Simulated WhatsApp OTP: $simulatedOtp');
         return 'whatsapp-verification-${DateTime.now().millisecondsSinceEpoch}';
-      } else {
-        Completer<String?> completer = Completer<String?>();
+      }
 
-        // Ensure the phone number is in E.164 format (includes + and country code)
-        if (!phoneNumber.startsWith('+')) {
-          phoneNumber = '+' + phoneNumber.replaceFirst(RegExp(r'^\+'), '');
-        }
+      // Regular SMS verification
+      Completer<String?> completer = Completer<String?>();
 
-        await FirebaseAuth.instance.verifyPhoneNumber(
-          phoneNumber: phoneNumber,
-          timeout: const Duration(seconds: 120), // Increased timeout
-          verificationCompleted: (PhoneAuthCredential credential) async {
-            print('Auto-verification completed - usually happens on Android only');
-            try {
-              _isLoading = true;
-              notifyListeners();
+      // Ensure the phone number is properly formatted in E.164 format
+      // This is critical - the number must start with + and include country code
+      if (!phoneNumber.startsWith('+')) {
+        phoneNumber = '+' + phoneNumber.replaceAll(RegExp(r'[^\d]'), '');
+      }
 
-              final userCredential = await _auth.signInWithCredential(credential);
-              final user = userCredential.user;
+      print('Formatted phone number for verification: $phoneNumber');
 
-              if (user != null) {
-                await _firestoreService.createNewUser(
-                    user.uid,
-                    user.displayName ?? 'Phone User',
-                    user.phoneNumber ?? ''
-                );
+      await FirebaseAuth.instance.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        timeout: const Duration(seconds: 120),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          print('Auto-verification completed (Android only)');
+          try {
+            final userCredential = await _auth.signInWithCredential(credential);
+            final user = userCredential.user;
 
-                await _notificationsService.saveTokenToDatabase(user.uid);
+            if (user != null) {
+              print('User auto-signed in with phone: ${user.uid}');
+              await _firestoreService.createNewUser(
+                  user.uid,
+                  user.displayName ?? 'Phone User',
+                  user.phoneNumber ?? ''
+              );
+              await _notificationsService.saveTokenToDatabase(user.uid);
 
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('userId', user.uid);
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.setString('userId', user.uid);
 
-                _isLoading = false;
-                notifyListeners();
-
-                if (!completer.isCompleted) {
-                  completer.complete('auto-verified');
-                }
-              }
-            } catch (e) {
-              print('Error in auto-verification: $e');
-              _errorMessage = 'Verification error: ${e.toString()}';
               _isLoading = false;
               notifyListeners();
 
               if (!completer.isCompleted) {
-                completer.complete(null);
+                completer.complete('auto-verified');
               }
             }
-          },
-          verificationFailed: (FirebaseAuthException e) {
-            print('Phone verification failed: ${e.code} - ${e.message}');
-            _errorMessage = _getReadablePhoneAuthError(e);
+          } catch (e) {
+            print('Error in auto-verification: $e');
+            _errorMessage = 'Verification error: ${e.toString()}';
             _isLoading = false;
             notifyListeners();
 
             if (!completer.isCompleted) {
               completer.complete(null);
             }
-          },
-          codeSent: (String verificationId, int? resendToken) {
-            print('SMS code sent to $phoneNumber, verification ID: $verificationId');
-            _isLoading = false;
-            notifyListeners();
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          print('Phone verification failed: ${e.code} - ${e.message}');
+          _errorMessage = _getReadablePhoneAuthError(e);
+          _isLoading = false;
+          notifyListeners();
 
-            if (!completer.isCompleted) {
-              completer.complete(verificationId);
-            }
-          },
-          codeAutoRetrievalTimeout: (String verificationId) {
-            print('Phone verification auto-retrieval timeout');
-            _isLoading = false;
-            notifyListeners();
+          if (!completer.isCompleted) {
+            completer.complete(null);
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          print('SMS code sent, verification ID: $verificationId');
+          _isLoading = false;
+          notifyListeners();
 
-            if (!completer.isCompleted) {
-              completer.complete(verificationId);
-            }
-          },
-        );
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          print('Auto-retrieval timeout for verification ID: $verificationId');
+          _isLoading = false;
+          notifyListeners();
 
-        return completer.future;
-      }
+          if (!completer.isCompleted) {
+            completer.complete(verificationId);
+          }
+        },
+        // Force using test phone numbers in test environment (remove in production)
+        // forceResendingToken: forceResendingToken,
+      );
+
+      return completer.future;
     } catch (e) {
       print('Send OTP error: $e');
       _errorMessage = 'Error sending verification code: ${e.toString()}';

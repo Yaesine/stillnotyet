@@ -38,10 +38,13 @@ class _PhoneLoginScreenState extends State<PhoneLoginScreen> {
     });
 
     try {
-      // Ensure proper E.164 format by cleaning any spaces or special characters
+      // Make sure to properly format the phone number
       final phoneText = _phoneController.text.trim();
       final cleanPhone = phoneText.replaceAll(RegExp(r'[^\d]'), '');
-      final phoneNumber = '$_selectedCountryCode$cleanPhone';
+
+      // Properly format the phone number with country code
+      // Ensure no spaces or special characters between country code and number
+      final phoneNumber = _selectedCountryCode + cleanPhone;
 
       print('Attempting to send OTP to: $phoneNumber');
 
