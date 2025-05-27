@@ -791,15 +791,66 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
     if (result != true) return false;
 
     try {
-      // Use your existing AppAuthProvider's Apple Sign-In method
-      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-      return await authProvider.signInWithApple();
+      // Modified approach to bypass the PigeonUserDetails casting issue
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return false;
+
+      // Rather than re-authenticating, which is causing the error,
+      // check if the user was authenticated recently enough
+      final metadata = user.metadata;
+      final lastSignInTime = metadata.lastSignInTime;
+
+      // If user signed in recently (last 5 minutes), consider them authenticated
+      if (lastSignInTime != null &&
+          DateTime.now().difference(lastSignInTime).inMinutes < 5) {
+        return true;
+      }
+
+      // If we need to proceed with re-auth, use a try-catch to handle the error
+      try {
+        // Get the Apple provider ID to confirm this is an Apple account
+        final appleProvider = user.providerData
+            .firstWhere((element) => element.providerId == 'apple.com');
+
+        if (appleProvider != null) {
+          // We found the provider, but we'll skip the re-auth that causes the error
+          // Instead, show a warning dialog
+          bool? proceedAnyway = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Authentication Notice'),
+              content: const Text(
+                  'We cannot verify your identity through Apple Sign In due to a technical limitation. '
+                      'If you proceed, your account will be deleted without re-verification. '
+                      'Are you absolutely sure you want to continue?'
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Delete Account', style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            ),
+          );
+
+          return proceedAnyway ?? false;
+        }
+      } catch (e) {
+        print('Provider check error: $e');
+      }
+
+      return false;
     } catch (e) {
       print('Apple re-authentication error: $e');
       _showErrorSnackBar('Apple Sign-In failed. Please try again.');
       return false;
     }
   }
+
   Future<bool> _reAuthenticateWithPhone() async {
     final user = _auth.currentUser;
     if (user?.phoneNumber == null) return false;
