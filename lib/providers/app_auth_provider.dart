@@ -78,8 +78,151 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
+  // Add this method to lib/providers/app_auth_provider.dart
+
+// Force refresh and save FCM token - call this on app startup and after login
+  Future<void> ensureFCMToken() async {
+    try {
+      final userId = currentUserId;
+      if (userId.isEmpty) {
+        print('Cannot ensure FCM token: No current user');
+        return;
+      }
+
+      print('Ensuring FCM token for user: $userId');
+
+      // First check if we already have a valid token
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>?;
+        final existingToken = data?['fcmToken'];
+
+        if (existingToken != null && existingToken.toString().isNotEmpty) {
+          print('User already has FCM token: ${existingToken.toString().substring(0, 20)}...');
+
+          // Verify the token is still valid by trying to get a fresh one
+          final freshToken = await FirebaseMessaging.instance.getToken();
+          if (freshToken != null && freshToken != existingToken) {
+            print('Token has changed, updating...');
+            await _updateFCMToken(freshToken);
+          }
+          return;
+        }
+      }
+
+      // No token found, request permission and get token
+      await _requestNotificationPermissionAndSaveToken();
+    } catch (e) {
+      print('Error ensuring FCM token: $e');
+    }
+  }
+
+// Request notification permission and save token
+  Future<void> _requestNotificationPermissionAndSaveToken() async {
+    try {
+      print('Requesting notification permission...');
+
+      // Request permission
+      NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+        announcement: false,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+      );
+
+      print('Permission status: ${settings.authorizationStatus}');
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
+
+        // Get the token
+        String? token = await FirebaseMessaging.instance.getToken();
+
+        if (token != null) {
+          await _updateFCMToken(token);
+          print('FCM token obtained and saved successfully');
+        } else {
+          print('Failed to get FCM token despite having permission');
+        }
+      } else {
+        print('Notification permission denied');
+      }
+    } catch (e) {
+      print('Error requesting permission and saving token: $e');
+    }
+  }
+
+// Update FCM token in Firestore
+  Future<void> _updateFCMToken(String token) async {
+    try {
+      final userId = currentUserId;
+      if (userId.isEmpty) return;
+
+      await _firestore.collection('users').doc(userId).update({
+        'fcmToken': token,
+        'tokenUpdatedAt': FieldValue.serverTimestamp(),
+        'platform': 'ios',
+        'appVersion': '1.0.0',
+        'deviceInfo': {
+          'platform': 'iOS',
+          'lastTokenUpdate': DateTime.now().toIso8601String(),
+        }
+      });
+
+      print('FCM token updated in Firestore: ${token.substring(0, 20)}...');
+    } catch (e) {
+      print('Error updating FCM token: $e');
+
+      // If update fails, try set with merge
+      try {
+        await _firestore.collection('users').doc(currentUserId).set({
+          'fcmToken': token,
+          'tokenUpdatedAt': FieldValue.serverTimestamp(),
+          'platform': 'ios',
+        }, SetOptions(merge: true));
+
+        print('FCM token saved with merge option');
+      } catch (e2) {
+        print('Error saving FCM token with merge: $e2');
+      }
+    }
+  }
+
+// Call this when app becomes active
+  Future<void> refreshFCMTokenIfNeeded() async {
+    try {
+      final userId = currentUserId;
+      if (userId.isEmpty) return;
+
+      // Check when token was last updated
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final data = userDoc.data() as Map<String, dynamic>?;
+        final tokenTimestamp = data?['tokenUpdatedAt'] as Timestamp?;
+
+        if (tokenTimestamp != null) {
+          final lastUpdate = tokenTimestamp.toDate();
+          final hoursSinceUpdate = DateTime.now().difference(lastUpdate).inHours;
+
+          // Refresh token if it's older than 24 hours
+          if (hoursSinceUpdate > 24) {
+            print('FCM token is ${hoursSinceUpdate} hours old, refreshing...');
+            await ensureFCMToken();
+          }
+        } else {
+          // No timestamp, refresh token
+          await ensureFCMToken();
+        }
+      }
+    } catch (e) {
+      print('Error checking token freshness: $e');
+    }
+  }
+
   // Force update FCM token and save to Firestore
-// Force update FCM token and save to Firestore
   Future<void> updateAndSaveFCMToken() async {
     try {
       if (currentUserId.isEmpty) {
@@ -88,18 +231,6 @@ class AppAuthProvider with ChangeNotifier {
       }
 
       print('Forcing FCM token update for user: $currentUserId');
-
-      // Request permission first if not already granted
-      NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
-
-      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-        print('User declined notification permissions');
-        return;
-      }
 
       // Get the token
       final fcmToken = await FirebaseMessaging.instance.getToken();
@@ -111,35 +242,23 @@ class AppAuthProvider with ChangeNotifier {
 
       print('Got FCM token: $fcmToken');
 
-      // Use set with merge to ensure document exists
+      // Save token to Firestore
       await _firestore
           .collection('users')
           .doc(currentUserId)
-          .set({
+          .update({
         'fcmToken': fcmToken,
         'tokenUpdatedAt': FieldValue.serverTimestamp(),
         'platform': 'ios',
         'appVersion': '1.0.0',
-        'notificationsEnabled': true,
-      }, SetOptions(merge: true));
+      });
 
       print('FCM token successfully updated in Firestore');
-
-      // Listen for token refresh
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
-        print('FCM Token refreshed: $newToken');
-        await _firestore
-            .collection('users')
-            .doc(currentUserId)
-            .update({
-          'fcmToken': newToken,
-          'tokenUpdatedAt': FieldValue.serverTimestamp(),
-        });
-      });
     } catch (e) {
       print('Error updating FCM token: $e');
     }
   }
+
   // Login with email and password
   Future<bool> login(String email, String password) async {
     try {

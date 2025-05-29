@@ -255,6 +255,8 @@ class _MainScreenState extends State<MainScreen> {
 
       // First load user data and ui components
       final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+      await authProvider.ensureFCMToken(); // Add this line
       await userProvider.forceSyncCurrentUser();
       await userProvider.loadCurrentUser();
 
@@ -275,7 +277,6 @@ class _MainScreenState extends State<MainScreen> {
       await Future.delayed(const Duration(seconds: 2));
 
       // Only now update location if user is authenticated
-      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
       final userId = authProvider.currentUserId;
       if (userId.isNotEmpty) {
         try {
@@ -287,7 +288,18 @@ class _MainScreenState extends State<MainScreen> {
         }
       }
     });
+
+    // Also listen to app lifecycle to refresh token when app becomes active
+    WidgetsBinding.instance.addObserver(_LifecycleObserver(
+      onResume: () async {
+        final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+        await authProvider.refreshFCMTokenIfNeeded();
+      },
+    ));
+
   }
+
+
 
 // Replace the _initializeNotificationHandler method in your _MainScreenState class
 
@@ -663,5 +675,19 @@ class _MainScreenState extends State<MainScreen> {
         ),
       ),
     );
+  }
+
+}
+// Add this helper class at the bottom of your main.dart file
+class _LifecycleObserver extends WidgetsBindingObserver {
+  final VoidCallback? onResume;
+
+  _LifecycleObserver({this.onResume});
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && onResume != null) {
+      onResume!();
+    }
   }
 }
