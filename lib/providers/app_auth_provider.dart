@@ -1,4 +1,4 @@
-// lib/providers/app_auth_provider.dart - Updated with Apple Sign In
+// lib/providers/app_auth_provider.dart - Updated with FCM token management
 
 import 'dart:async';
 import 'dart:convert';
@@ -6,6 +6,8 @@ import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../services/firestore_service.dart';
@@ -13,6 +15,7 @@ import '../services/notifications_service.dart';
 
 class AppAuthProvider with ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirestoreService _firestoreService = FirestoreService();
   final NotificationsService _notificationsService = NotificationsService();
   User? _user;
@@ -32,6 +35,8 @@ class AppAuthProvider with ChangeNotifier {
     _user = _auth.currentUser;
     if (_user != null) {
       print('User is already authenticated: ${_user?.uid}');
+      // Update FCM token on initialization if user is already logged in
+      updateAndSaveFCMToken();
     } else {
       print('No authenticated user at startup');
     }
@@ -39,6 +44,10 @@ class AppAuthProvider with ChangeNotifier {
     _auth.authStateChanges().listen((User? user) {
       print('Auth state changed: ${user?.uid ?? 'No user'}');
       _user = user;
+      if (user != null) {
+        // Update FCM token when auth state changes to logged in
+        updateAndSaveFCMToken();
+      }
       notifyListeners();
     });
   }
@@ -60,8 +69,49 @@ class AppAuthProvider with ChangeNotifier {
   Future<void> _continueAuthInitialization() async {
     try {
       _user = _auth.currentUser;
+      if (_user != null) {
+        // Ensure FCM token is up to date
+        await updateAndSaveFCMToken();
+      }
     } catch (e) {
       print('Background auth initialization error: $e');
+    }
+  }
+
+  // Force update FCM token and save to Firestore
+  Future<void> updateAndSaveFCMToken() async {
+    try {
+      if (currentUserId.isEmpty) {
+        print('Cannot update FCM token: No current user ID');
+        return;
+      }
+
+      print('Forcing FCM token update for user: $currentUserId');
+
+      // Get the token
+      final fcmToken = await FirebaseMessaging.instance.getToken();
+
+      if (fcmToken == null || fcmToken.isEmpty) {
+        print('Failed to obtain FCM token');
+        return;
+      }
+
+      print('Got FCM token: $fcmToken');
+
+      // Save token to Firestore
+      await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .update({
+        'fcmToken': fcmToken,
+        'tokenUpdatedAt': FieldValue.serverTimestamp(),
+        'platform': 'ios',
+        'appVersion': '1.0.0',
+      });
+
+      print('FCM token successfully updated in Firestore');
+    } catch (e) {
+      print('Error updating FCM token: $e');
     }
   }
 
@@ -83,6 +133,9 @@ class AppAuthProvider with ChangeNotifier {
 
       if (user != null) {
         await _notificationsService.saveTokenToDatabase(user.uid);
+        // Force update FCM token
+        await updateAndSaveFCMToken();
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userId', user.uid);
         print('User logged in successfully: ${user.uid}');
@@ -170,6 +223,8 @@ class AppAuthProvider with ChangeNotifier {
 
       try {
         await _notificationsService.saveTokenToDatabase(userId);
+        // Force update FCM token
+        await updateAndSaveFCMToken();
         print('FCM token saved');
       } catch (e) {
         print('Non-critical error saving FCM token: $e');
@@ -224,6 +279,8 @@ class AppAuthProvider with ChangeNotifier {
         // Try to save notification token, but don't fail if it doesn't work
         try {
           await _notificationsService.saveTokenToDatabase(user.uid);
+          // Force update FCM token
+          await updateAndSaveFCMToken();
         } catch (e) {
           print('Notification token error (non-blocking): $e');
           // Continue anyway - notifications aren't critical for sign-in
@@ -245,6 +302,7 @@ class AppAuthProvider with ChangeNotifier {
       return false;
     }
   }
+
   // APPLE SIGN IN IMPLEMENTATION
   Future<bool> signInWithApple() async {
     try {
@@ -303,6 +361,8 @@ class AppAuthProvider with ChangeNotifier {
 
         // Save FCM token
         await _notificationsService.saveTokenToDatabase(user.uid);
+        // Force update FCM token
+        await updateAndSaveFCMToken();
 
         // Save to SharedPreferences
         final prefs = await SharedPreferences.getInstance();
@@ -404,6 +464,8 @@ class AppAuthProvider with ChangeNotifier {
                   user.phoneNumber ?? ''
               );
               await _notificationsService.saveTokenToDatabase(user.uid);
+              // Force update FCM token
+              await updateAndSaveFCMToken();
 
               final prefs = await SharedPreferences.getInstance();
               await prefs.setString('userId', user.uid);
@@ -468,8 +530,7 @@ class AppAuthProvider with ChangeNotifier {
     }
   }
 
-// Add this helper method to provide better error messages
-// Update the _getReadablePhoneAuthError method in lib/providers/app_auth_provider.dart
+  // Helper method to provide better error messages for phone auth
   String _getReadablePhoneAuthError(FirebaseAuthException e) {
     switch (e.code) {
       case 'invalid-phone-number':
@@ -492,6 +553,7 @@ class AppAuthProvider with ChangeNotifier {
         return e.message ?? 'An error occurred during phone verification.';
     }
   }
+
   Future<bool> verifyOtp(String verificationId, String otp) async {
     try {
       _errorMessage = null;
@@ -518,6 +580,8 @@ class AppAuthProvider with ChangeNotifier {
             );
 
             await _notificationsService.saveTokenToDatabase(user.uid);
+            // Force update FCM token
+            await updateAndSaveFCMToken();
 
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('userId', user.uid);
@@ -557,6 +621,8 @@ class AppAuthProvider with ChangeNotifier {
             );
 
             await _notificationsService.saveTokenToDatabase(user.uid);
+            // Force update FCM token
+            await updateAndSaveFCMToken();
 
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('userId', user.uid);
@@ -584,10 +650,25 @@ class AppAuthProvider with ChangeNotifier {
       return false;
     }
   }
+
   // Logout
   Future<void> logout() async {
     try {
       print('Attempting logout');
+
+      // Clear FCM token before logging out
+      final userId = currentUserId;
+      if (userId.isNotEmpty) {
+        try {
+          await _firestore.collection('users').doc(userId).update({
+            'fcmToken': FieldValue.delete(),
+            'lastLogout': FieldValue.serverTimestamp()
+          });
+          print('FCM token cleared on logout');
+        } catch (e) {
+          print('Error clearing FCM token: $e');
+        }
+      }
 
       await _auth.signOut();
 
@@ -648,6 +729,10 @@ class AppAuthProvider with ChangeNotifier {
         print('User ID found in SharedPreferences but not in Firebase Auth, clearing preferences');
         return false;
       }
+
+      // User is logged in, update FCM token
+      await updateAndSaveFCMToken();
+
       print('User is logged in: $userId');
       return true;
     }

@@ -8,6 +8,7 @@ import '../models/user_model.dart';
 import '../models/match_model.dart';
 import '../models/message_model.dart';
 import 'notification_manager.dart';
+import 'package:rxdart/rxdart.dart' as Rx;
 
 class FirestoreService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -817,29 +818,56 @@ class FirestoreService {
   }
 
   // Get messages for a specific match
+
+// Replace the getMessages method in lib/services/firestore_service.dart with this improved version
   Future<List<Message>> getMessages(String matchedUserId) async {
     try {
-      if (currentUserId == null) return [];
+      if (currentUserId == null) {
+        print('Cannot get messages: No current user ID available');
+        return [];
+      }
 
-      // Query messages where the conversation is between the current user and the matched user
-      QuerySnapshot messagesSnapshot = await _messagesCollection
-          .where('senderId', whereIn: [currentUserId, matchedUserId])
-          .where('receiverId', whereIn: [currentUserId, matchedUserId])
+      print('Getting messages between $currentUserId and $matchedUserId');
+
+      // Use a more direct query approach instead of whereIn filters
+      // First get messages where current user is sender and matched user is receiver
+      QuerySnapshot sentMessagesSnapshot = await _messagesCollection
+          .where('senderId', isEqualTo: currentUserId)
+          .where('receiverId', isEqualTo: matchedUserId)
           .orderBy('timestamp', descending: true)
           .limit(50)
           .get();
 
-      List<Message> messages = [];
-      for (var doc in messagesSnapshot.docs) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      // Then get messages where current user is receiver and matched user is sender
+      QuerySnapshot receivedMessagesSnapshot = await _messagesCollection
+          .where('senderId', isEqualTo: matchedUserId)
+          .where('receiverId', isEqualTo: currentUserId)
+          .orderBy('timestamp', descending: true)
+          .limit(50)
+          .get();
 
-        // Only include messages between these two specific users
-        if ((data['senderId'] == currentUserId && data['receiverId'] == matchedUserId) ||
-            (data['senderId'] == matchedUserId && data['receiverId'] == currentUserId)) {
-          messages.add(Message.fromFirestore(doc));
-        }
+      // Combine both sets of messages
+      List<Message> messages = [];
+
+      // Add sent messages
+      for (var doc in sentMessagesSnapshot.docs) {
+        messages.add(Message.fromFirestore(doc));
       }
 
+      // Add received messages
+      for (var doc in receivedMessagesSnapshot.docs) {
+        messages.add(Message.fromFirestore(doc));
+      }
+
+      // Sort by timestamp, newest first
+      messages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+      // Take only the most recent 50 messages if there are more
+      if (messages.length > 50) {
+        messages = messages.sublist(0, 50);
+      }
+
+      print('Retrieved ${messages.length} messages between $currentUserId and $matchedUserId');
       return messages;
     } catch (e) {
       print('Error getting messages: $e');
@@ -848,16 +876,21 @@ class FirestoreService {
   }
 
   // Send a message - improved implementation
+// In the sendMessage method, add the conversationId field:
   Future<bool> sendMessage(String receiverId, String text) async {
     try {
       if (currentUserId == null) return false;
 
       print('Sending message from $currentUserId to $receiverId: "$text"');
 
+      // Create the conversation ID
+      String conversationId = _getConversationId(currentUserId!, receiverId);
+
       // Create the message document
       DocumentReference messageRef = await _messagesCollection.add({
         'senderId': currentUserId,
         'receiverId': receiverId,
+        'conversationId': conversationId, // Add this field
         'text': text,
         'timestamp': Timestamp.now(),
         'isRead': false,
@@ -910,21 +943,91 @@ class FirestoreService {
   }
 
   // Listen to new messages stream
+// Also replace the messagesStream method with this improved version
+// Updated messagesStream method with correct rxdart syntax
   Stream<List<Message>> messagesStream(String matchedUserId) {
     if (currentUserId == null) {
+      print('Cannot start messages stream: No current user ID available');
       return Stream.value([]);
     }
 
     print('Setting up messages stream between $currentUserId and $matchedUserId');
 
-    // Create a broader query and then filter in memory
+    // Create two streams: one for sent messages, one for received
+    Stream<QuerySnapshot> sentMessagesStream = _messagesCollection
+        .where('senderId', isEqualTo: currentUserId)
+        .where('receiverId', isEqualTo: matchedUserId)
+        .orderBy('timestamp', descending: true)
+        .limit(50)
+        .snapshots();
+
+    Stream<QuerySnapshot> receivedMessagesStream = _messagesCollection
+        .where('senderId', isEqualTo: matchedUserId)
+        .where('receiverId', isEqualTo: currentUserId)
+        .orderBy('timestamp', descending: true)
+        .limit(50)
+        .snapshots();
+
+    // Use Rx.CombineLatestStream instead of combineLatest2
+    return Rx.CombineLatestStream.combine2(
+        sentMessagesStream,
+        receivedMessagesStream,
+            (QuerySnapshot sentSnapshot, QuerySnapshot receivedSnapshot) {
+          List<Message> messages = [];
+
+          // Add sent messages
+          for (var doc in sentSnapshot.docs) {
+            try {
+              messages.add(Message.fromFirestore(doc));
+            } catch (e) {
+              print('Error parsing sent message: $e');
+            }
+          }
+
+          // Add received messages
+          for (var doc in receivedSnapshot.docs) {
+            try {
+              messages.add(Message.fromFirestore(doc));
+            } catch (e) {
+              print('Error parsing received message: $e');
+            }
+          }
+
+          // Sort by timestamp, newest first
+          messages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+
+          // Take only the most recent 50 messages if there are more
+          if (messages.length > 50) {
+            messages = messages.sublist(0, 50);
+          }
+
+          print('Got ${sentSnapshot.docs.length + receivedSnapshot.docs.length} total message documents');
+          print('Processed ${messages.length} messages for chat UI');
+
+          return messages;
+        }
+    ).handleError((error) {
+      print('Error in messages stream: $error');
+      return [];
+    });
+  }
+
+// Alternative implementation without rxdart (if you prefer not to add the dependency)
+  Stream<List<Message>> messagesStreamWithoutRxdart(String matchedUserId) {
+    if (currentUserId == null) {
+      print('Cannot start messages stream: No current user ID available');
+      return Stream.value([]);
+    }
+
+    print('Setting up messages stream between $currentUserId and $matchedUserId');
+
+    // Just use one broader query that will include all messages between the two users
     return _messagesCollection
         .orderBy('timestamp', descending: true)
-        .limit(100) // Add a reasonable limit
+        .limit(100)  // Get a larger number to filter
         .snapshots()
         .map((snapshot) {
       List<Message> messages = [];
-
       print('Got ${snapshot.docs.length} total message documents');
 
       for (var doc in snapshot.docs) {
@@ -933,7 +1036,7 @@ class FirestoreService {
           String senderId = data['senderId'] ?? '';
           String receiverId = data['receiverId'] ?? '';
 
-          // Only include messages that are between these two users
+          // Only include messages between these two specific users
           if ((senderId == currentUserId && receiverId == matchedUserId) ||
               (senderId == matchedUserId && receiverId == currentUserId)) {
             messages.add(Message.fromFirestore(doc));
@@ -944,10 +1047,24 @@ class FirestoreService {
       }
 
       print('Filtered to ${messages.length} relevant messages for chat UI');
+
       return messages;
+    })
+        .handleError((error) {
+      print('Error in messages stream: $error');
+      return <Message>[];
     });
   }
 
+// Use this import at the top of the file
+
+
+  // Add this helper method
+  String _getConversationId(String userId1, String userId2) {
+    // Create a consistent conversation ID by sorting user IDs
+    List<String> sortedIds = [userId1, userId2]..sort();
+    return '${sortedIds[0]}_${sortedIds[1]}';
+  }
   // Listen to matches stream
   Stream<List<Match>> matchesStream() {
     if (currentUserId == null) {

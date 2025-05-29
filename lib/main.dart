@@ -71,6 +71,13 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     print('Firebase initialized successfully');
+    // Initialize notifications service early
+    final notificationsService = NotificationsService();
+    await notificationsService.initialize();
+
+    // Initialize notification manager
+    final notificationManager = NotificationManager();
+    await notificationManager.initialize();
   } catch (e) {
     print('Error initializing Firebase: $e');
   }
@@ -282,15 +289,64 @@ class _MainScreenState extends State<MainScreen> {
     });
   }
 
-  void _initializeNotificationHandler() {
-    FirebaseMessaging.instance.onTokenRefresh.listen((token) {
-      print('FCM Token: $token');
-      _saveTokenToFirestore(token);
-    });
+// Replace the _initializeNotificationHandler method in your _MainScreenState class
 
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      _showInAppNotification(message);
-    });
+  void _initializeNotificationHandler() {
+    try {
+      print('Initializing notification handler in MainScreen');
+
+      // Get and save the current token
+      _getAndSaveToken();
+
+      // Listen for token refreshes
+      FirebaseMessaging.instance.onTokenRefresh.listen((token) {
+        print('FCM Token refreshed: $token');
+        _saveTokenToFirestore(token);
+      });
+
+      // Configure notification handlers
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('Received foreground message:');
+        print('  Title: ${message.notification?.title}');
+        print('  Body: ${message.notification?.body}');
+        print('  Data: ${message.data}');
+
+        _showInAppNotification(message);
+      });
+
+      // Check for notification that opened the app
+      FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+        if (message != null) {
+          print('App opened from terminated state with notification');
+          _handleNotificationTap(message);
+        }
+      });
+
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        print('App opened from background with notification');
+        _handleNotificationTap(message);
+      });
+
+      print('Notification handler initialized successfully');
+    } catch (e) {
+      print('Error initializing notification handler: $e');
+    }
+  }
+
+// Add these new methods to your _MainScreenState class
+  Future<void> _getAndSaveToken() async {
+    try {
+      print('Getting FCM token...');
+      String? token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        print('FCM Token: $token');
+        await _saveTokenToFirestore(token);
+      } else {
+        print('Failed to get FCM token');
+      }
+    } catch (e) {
+      print('Error getting FCM token: $e');
+    }
   }
 
   void _showInAppNotification(RemoteMessage message) {
@@ -323,7 +379,7 @@ class _MainScreenState extends State<MainScreen> {
             TextButton(
               onPressed: () {
                 Navigator.pop(context);
-                _handleNotificationAction(message);
+                _handleNotificationTap(message);
               },
               child: Text('View', style: TextStyle(color: actionColor, fontWeight: FontWeight.bold)),
             ),
@@ -331,6 +387,134 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+
+  void _handleNotificationTap(RemoteMessage message) {
+    try {
+      print('Handling notification tap:');
+      print('  Title: ${message.notification?.title}');
+      print('  Body: ${message.notification?.body}');
+      print('  Data: ${message.data}');
+
+      final type = message.data['type'];
+      final senderId = message.data['senderId'];
+
+      if (type == null) return;
+
+      switch (type) {
+        case 'match':
+          setState(() {
+            _currentIndex = 3; // Switch to Matches tab
+          });
+          _pageController.animateToPage(
+            3,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+          break;
+
+        case 'message':
+          if (senderId != null) {
+            final userProvider = Provider.of<UserProvider>(context, listen: false);
+
+            // Find the matched user by ID
+            for (final user in userProvider.matchedUsers) {
+              if (user.id == senderId) {
+                Navigator.of(context).pushNamed('/chat', arguments: user);
+                return;
+              }
+            }
+
+            // If user not found in matches, just go to matches tab
+            setState(() {
+              _currentIndex = 3; // Switch to Matches tab
+            });
+            _pageController.animateToPage(
+              3,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          } else {
+            setState(() {
+              _currentIndex = 3; // Switch to Matches tab
+            });
+            _pageController.animateToPage(
+              3,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          }
+          break;
+
+        case 'super_like':
+        case 'profile_view':
+          setState(() {
+            _currentIndex = 2; // Switch to Likes tab
+          });
+          _pageController.animateToPage(
+            2,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+          break;
+
+        default:
+        // Default to home
+          setState(() {
+            _currentIndex = 0;
+          });
+          _pageController.animateToPage(
+            0,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+      }
+    } catch (e) {
+      print('Error handling notification tap: $e');
+    }
+  }
+
+  Future<void> _saveTokenToFirestore(String token) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId != null) {
+        print('Saving FCM token to Firestore: $token');
+
+        // First check if token is different from existing one
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (userDoc.exists) {
+          final userData = userDoc.data();
+          final existingToken = userData?['fcmToken'];
+
+          if (existingToken == token) {
+            print('FCM token unchanged, skipping update');
+            return;
+          }
+        }
+
+        // Update token in Firestore
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .update({
+          'fcmToken': token,
+          'tokenTimestamp': FieldValue.serverTimestamp(),
+          'platform': 'ios',
+          'appVersion': '1.0.0',
+        });
+
+        print('FCM token saved successfully to Firestore');
+      } else {
+        print('Cannot save FCM token: No user ID available');
+      }
+    } catch (e) {
+      print('Error saving FCM token: $e');
+    }
+  }
+
 
   void _handleNotificationAction(RemoteMessage message) {
     final type = message.data['type'];
@@ -395,15 +579,6 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  Future<void> _saveTokenToFirestore(String token) async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .update({'fcmToken': token});
-    }
-  }
 
   @override
   void dispose() {
