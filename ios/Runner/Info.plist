@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>New Tinder Clone</string>
+    <string>Marifecto</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -59,6 +59,11 @@
     </array>
 
     <!-- Required for iOS 14+ Photo Library Access -->
+    <!-- Add to Info.plist -->
+    <key>FirebaseMessagingAutoInitEnabled</key>
+    <true/>
+    <key>FirebaseAppDelegateProxyEnabled</key>
+    <true/>
     <key>NSPhotoLibraryUsageDescription</key>
     <string>This app requires access to your photo library to upload profile pictures.</string>
     <key>NSCameraUsageDescription</key>
@@ -66,5 +71,11 @@
     <!-- Required for Location Services -->
     <key>NSLocationWhenInUseUsageDescription</key>
     <string>This app requires your location to find nearby matches.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+       <string>fetch</string>
+       <string>remote-notification</string>
+    </array>
+
 </dict>
 </plist>
