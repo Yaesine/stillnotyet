@@ -4,6 +4,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' as auth;
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../models/user_model.dart';
 import '../models/match_model.dart';
 import '../models/message_model.dart';
@@ -97,6 +98,50 @@ class FirestoreService {
       }
     } catch (e) {
       print('ERROR creating test users: $e');
+    }
+  }
+
+  // Debug method to check FCM tokens for all users
+  Future<void> checkAndUpdateUserTokens() async {
+    try {
+      print('===== CHECKING FCM TOKENS FOR ALL USERS =====');
+
+      QuerySnapshot usersSnapshot = await _usersCollection.get();
+
+      for (var doc in usersSnapshot.docs) {
+        Map<String, dynamic> userData = doc.data() as Map<String, dynamic>;
+        String userId = doc.id;
+        String? fcmToken = userData['fcmToken'];
+        String userName = userData['name'] ?? 'Unknown';
+
+        if (fcmToken == null || fcmToken.isEmpty) {
+          print('❌ User $userName ($userId) has NO FCM token');
+
+          // If this is the current user, try to update their token
+          if (userId == currentUserId) {
+            print('Attempting to update token for current user...');
+            try {
+              String? newToken = await FirebaseMessaging.instance.getToken();
+              if (newToken != null) {
+                await _usersCollection.doc(userId).update({
+                  'fcmToken': newToken,
+                  'tokenUpdatedAt': FieldValue.serverTimestamp(),
+                  'platform': 'ios',
+                });
+                print('✅ Updated token for $userName');
+              }
+            } catch (e) {
+              print('Error updating token: $e');
+            }
+          }
+        } else {
+          print('✅ User $userName ($userId) has FCM token: ${fcmToken.substring(0, 20)}...');
+        }
+      }
+
+      print('===== FCM TOKEN CHECK COMPLETE =====');
+    } catch (e) {
+      print('Error checking user tokens: $e');
     }
   }
 

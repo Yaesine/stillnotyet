@@ -79,6 +79,7 @@ class AppAuthProvider with ChangeNotifier {
   }
 
   // Force update FCM token and save to Firestore
+// Force update FCM token and save to Firestore
   Future<void> updateAndSaveFCMToken() async {
     try {
       if (currentUserId.isEmpty) {
@@ -87,6 +88,18 @@ class AppAuthProvider with ChangeNotifier {
       }
 
       print('Forcing FCM token update for user: $currentUserId');
+
+      // Request permission first if not already granted
+      NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus != AuthorizationStatus.authorized) {
+        print('User declined notification permissions');
+        return;
+      }
 
       // Get the token
       final fcmToken = await FirebaseMessaging.instance.getToken();
@@ -98,23 +111,35 @@ class AppAuthProvider with ChangeNotifier {
 
       print('Got FCM token: $fcmToken');
 
-      // Save token to Firestore
+      // Use set with merge to ensure document exists
       await _firestore
           .collection('users')
           .doc(currentUserId)
-          .update({
+          .set({
         'fcmToken': fcmToken,
         'tokenUpdatedAt': FieldValue.serverTimestamp(),
         'platform': 'ios',
         'appVersion': '1.0.0',
-      });
+        'notificationsEnabled': true,
+      }, SetOptions(merge: true));
 
       print('FCM token successfully updated in Firestore');
+
+      // Listen for token refresh
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+        print('FCM Token refreshed: $newToken');
+        await _firestore
+            .collection('users')
+            .doc(currentUserId)
+            .update({
+          'fcmToken': newToken,
+          'tokenUpdatedAt': FieldValue.serverTimestamp(),
+        });
+      });
     } catch (e) {
       print('Error updating FCM token: $e');
     }
   }
-
   // Login with email and password
   Future<bool> login(String email, String password) async {
     try {
