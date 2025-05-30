@@ -101,6 +101,88 @@ class FirestoreService {
   }
 
 
+  // Add this method to your FirestoreService class for debugging
+
+  Future<void> debugMessageNotification(String receiverId, String messageText) async {
+    try {
+      print('\n🔍 DEBUG: Starting message notification process');
+      print('📤 Sender ID: $currentUserId');
+      print('📥 Receiver ID: $receiverId');
+      print('💬 Message: $messageText');
+
+      // Step 1: Check if receiver exists
+      DocumentSnapshot receiverDoc = await _firestore.collection('users').doc(receiverId).get();
+      if (!receiverDoc.exists) {
+        print('❌ ERROR: Receiver document does not exist!');
+        return;
+      }
+
+      Map<String, dynamic>? receiverData = receiverDoc.data() as Map<String, dynamic>?;
+      print('✅ Receiver found: ${receiverData?['name']}');
+
+      // Step 2: Check FCM token
+      String? fcmToken = receiverData?['fcmToken'];
+      if (fcmToken == null || fcmToken.isEmpty) {
+        print('❌ ERROR: Receiver has NO FCM token!');
+        print('   Attempting to create notification without token...');
+      } else {
+        print('✅ FCM Token found: ${fcmToken.substring(0, 20)}...');
+      }
+
+      // Step 3: Get sender name
+      DocumentSnapshot senderDoc = await _firestore.collection('users').doc(currentUserId).get();
+      Map<String, dynamic>? senderData = senderDoc.data() as Map<String, dynamic>?;
+      String senderName = senderData?['name'] ?? 'Someone';
+      print('✅ Sender name: $senderName');
+
+      // Step 4: Create notification document directly
+      print('📝 Creating notification document...');
+
+      DocumentReference notificationRef = await _firestore.collection('notifications').add({
+        'type': 'message',
+        'title': '💌 New Message',
+        'body': '$senderName: ${messageText.length > 50 ? messageText.substring(0, 47) + '...' : messageText}',
+        'recipientId': receiverId,
+        'fcmToken': fcmToken,
+        'data': {
+          'type': 'message',
+          'senderId': currentUserId,
+          'messageText': messageText,
+          'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': fcmToken != null ? 'pending' : 'pending_token',
+        'platform': 'ios',
+        'priority': 'high',
+      });
+
+      print('✅ Notification document created with ID: ${notificationRef.id}');
+
+      // Step 5: Check if the notification document was processed
+      await Future.delayed(Duration(seconds: 2));
+
+      DocumentSnapshot notificationDoc = await notificationRef.get();
+      Map<String, dynamic>? notificationData = notificationDoc.data() as Map<String, dynamic>?;
+      String? status = notificationData?['status'];
+
+      print('📊 Notification status after 2 seconds: $status');
+
+      if (status == 'error') {
+        print('❌ Notification error: ${notificationData?['error']}');
+        print('   Error code: ${notificationData?['errorCode']}');
+      } else if (status == 'sent') {
+        print('✅ Notification sent successfully!');
+      } else {
+        print('⏳ Notification still pending...');
+      }
+
+      print('🔍 DEBUG: Notification process complete\n');
+
+    } catch (e) {
+      print('❌ DEBUG ERROR: $e');
+    }
+  }
+
 
   // Create or update user profile
   Future<void> updateUserProfile(User user) async {
@@ -877,8 +959,8 @@ class FirestoreService {
     }
   }
 
-  // Send a message - improved implementation
-// In the sendMessage method, add the conversationId field:
+  // Replace your sendMessage method in FirestoreService with this version
+
   Future<bool> sendMessage(String receiverId, String text) async {
     try {
       if (currentUserId == null) return false;
@@ -892,27 +974,36 @@ class FirestoreService {
       DocumentReference messageRef = await _messagesCollection.add({
         'senderId': currentUserId,
         'receiverId': receiverId,
-        'conversationId': conversationId, // Add this field
+        'conversationId': conversationId,
         'text': text,
         'timestamp': Timestamp.now(),
         'isRead': false,
-        'isDelivered': true, // Mark as delivered when sent
-        'type': 'text', // Default to text message
+        'isDelivered': true,
+        'type': 'text',
       });
 
       print('Message sent with ID: ${messageRef.id}');
 
-      // Get sender's name for the notification
-      DocumentSnapshot senderDoc = await _usersCollection.doc(currentUserId).get();
-      Map<String, dynamic>? senderData = senderDoc.data() as Map<String, dynamic>?;
-      String senderName = senderData?['name'] ?? 'Someone';
+      // DEBUG: Call our debug method
+      await debugMessageNotification(receiverId, text);
 
-      // Send message notification
-      await _notificationManager.sendMessageNotification(
-          receiverId,
-          senderName,
-          text
-      );
+      // Also call the notification manager method
+      try {
+        // Get sender's name for the notification
+        DocumentSnapshot senderDoc = await _usersCollection.doc(currentUserId).get();
+        Map<String, dynamic>? senderData = senderDoc.data() as Map<String, dynamic>?;
+        String senderName = senderData?['name'] ?? 'Someone';
+
+        // Send message notification
+        await _notificationManager.sendMessageNotification(
+            receiverId,
+            senderName,
+            text
+        );
+      } catch (notificationError) {
+        print('Error in notification process: $notificationError');
+        // Don't fail the message send if notification fails
+      }
 
       return true;
     } catch (e) {

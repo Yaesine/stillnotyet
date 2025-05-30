@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../models/user_model.dart';
 import '../models/message_model.dart';
 import 'package:intl/intl.dart';
+import '../widgets/FCMTokenFixer.dart';
+import '../widgets/TestNotificationButton.dart';
 import '../widgets/components/letter_avatar.dart';
 
 import '../providers/app_auth_provider.dart';
@@ -207,6 +209,8 @@ class _ModernChatScreenState extends State<ModernChatScreen> {
   }
 
   @override
+  // Update your build method's AppBar to include the test button
+
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -240,6 +244,38 @@ class _ModernChatScreenState extends State<ModernChatScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
+        // ADD THIS: Actions with the test button
+        actions: [
+          // Test notification button - remove this after testing
+          IconButton(
+            icon: const Icon(Icons.science, color: Colors.orange),
+            onPressed: () {
+              // Show the test button in a dialog
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Notification Test'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Test notifications with current chat partner'),
+                      const SizedBox(height: 16),
+                      TestNotificationButton(recipientId: _matchedUser?.id),
+                      const SizedBox(height: 16),
+                      FixTokenButton(), // ADD THIS LINE
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

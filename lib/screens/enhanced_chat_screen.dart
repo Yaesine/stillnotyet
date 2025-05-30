@@ -7,6 +7,7 @@ import '../models/message_model.dart';
 import '../providers/app_auth_provider.dart';
 import '../providers/message_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/TestNotificationButton.dart';
 import '../widgets/components/typing_indicator.dart';
 import '../widgets/components/profile_avatar.dart';
 import '../widgets/components/loading_indicator.dart';
@@ -223,6 +224,9 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> with SingleTick
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: AppColors.textPrimary),
         actions: [
+          TestNotificationButton(
+            recipientId: _matchedUser?.id, // Pass the chat partner's ID
+          ),
           IconButton(
             icon: const Icon(Icons.more_vert),
             onPressed: () {

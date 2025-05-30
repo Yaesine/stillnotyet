@@ -14,6 +14,7 @@ import 'package:new_tinder_clone/screens/privacy_safety_screen.dart';
 import 'package:new_tinder_clone/screens/splash_screen.dart';
 import 'package:new_tinder_clone/screens/terms_of_service_screen.dart';
 import 'package:new_tinder_clone/screens/theme_settings_screen.dart';
+import 'package:new_tinder_clone/widgets/FCMTokenFixer.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -251,6 +252,8 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await FCMTokenFixer.ensureTokenOnStartup();
+
       _initializeNotificationHandler();
 
       // First load user data and ui components
