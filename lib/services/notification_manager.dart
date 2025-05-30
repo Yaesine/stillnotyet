@@ -290,6 +290,8 @@ class NotificationManager {
   }
 
   // Create notification in Firestore (for cloud functions to send)
+  // Update the _createNotificationDocument method in NotificationManager to prevent duplicates
+
   Future<void> _createNotificationDocument({
     required String type,
     required String title,
@@ -304,7 +306,28 @@ class NotificationManager {
         return;
       }
 
-      final notificationId = 'notification_${DateTime.now().millisecondsSinceEpoch}_${recipientId}';
+      // Create a unique notification ID to prevent duplicates
+      final notificationId = 'notification_${type}_${DateTime.now().millisecondsSinceEpoch}_${recipientId}';
+
+      // For message notifications, check if we already created one recently
+      if (type == 'message' && data['messageText'] != null) {
+        // Check if we created a similar notification in the last 5 seconds
+        final recentCutoff = DateTime.now().subtract(Duration(seconds: 5));
+
+        final recentNotifications = await _firestore
+            .collection('notifications')
+            .where('recipientId', isEqualTo: recipientId)
+            .where('type', isEqualTo: 'message')
+            .where('data.senderId', isEqualTo: data['senderId'])
+            .where('timestamp', isGreaterThan: Timestamp.fromDate(recentCutoff))
+            .limit(1)
+            .get();
+
+        if (recentNotifications.docs.isNotEmpty) {
+          print('Similar notification created recently, skipping duplicate');
+          return;
+        }
+      }
 
       await _firestore.collection('notifications').doc(notificationId).set({
         'type': type,
@@ -317,6 +340,7 @@ class NotificationManager {
         'status': 'pending',
         'platform': 'ios', // Specify iOS platform for platform-specific formatting
         'priority': 'high', // Set high priority for important notifications
+        'createdAt': DateTime.now().toIso8601String(), // For debugging
       });
 
       print('Notification document created for $recipientId: $type');

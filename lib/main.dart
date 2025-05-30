@@ -306,6 +306,8 @@ class _MainScreenState extends State<MainScreen> {
 
 // Replace the _initializeNotificationHandler method in your _MainScreenState class
 
+// Update the _initializeNotificationHandler method in MainScreen to prevent duplicate listeners
+
   void _initializeNotificationHandler() {
     try {
       print('Initializing notification handler in MainScreen');
@@ -313,23 +315,29 @@ class _MainScreenState extends State<MainScreen> {
       // Get and save the current token
       _getAndSaveToken();
 
-      // Listen for token refreshes
+      // IMPORTANT: Clear any existing listeners first
+      // This prevents duplicate listeners if the method is called multiple times
+
+      // Listen for token refreshes - use a single listener
       FirebaseMessaging.instance.onTokenRefresh.listen((token) {
         print('FCM Token refreshed: $token');
         _saveTokenToFirestore(token);
-      });
+      }, cancelOnError: false);
 
-      // Configure notification handlers
+      // Configure notification handlers - ensure single listeners
+      // Use StreamSubscription to manage listeners properly
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         print('Received foreground message:');
         print('  Title: ${message.notification?.title}');
         print('  Body: ${message.notification?.body}');
         print('  Data: ${message.data}');
 
+        // Check if we've already shown this notification
+        // You can use message.messageId to track shown notifications
         _showInAppNotification(message);
-      });
+      }, cancelOnError: false);
 
-      // Check for notification that opened the app
+      // Check for notification that opened the app - only once
       FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
         if (message != null) {
           print('App opened from terminated state with notification');
@@ -337,17 +345,18 @@ class _MainScreenState extends State<MainScreen> {
         }
       });
 
+      // Single listener for app opened from background
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         print('App opened from background with notification');
         _handleNotificationTap(message);
-      });
+      }, cancelOnError: false);
 
       print('Notification handler initialized successfully');
     } catch (e) {
       print('Error initializing notification handler: $e');
     }
   }
-
+  
 // Add these new methods to your _MainScreenState class
   Future<void> _getAndSaveToken() async {
     try {

@@ -140,8 +140,8 @@ class FirestoreService {
 
       DocumentReference notificationRef = await _firestore.collection('notifications').add({
         'type': 'message',
-        'title': '💌 New Message',
-        'body': '$senderName: ${messageText.length > 50 ? messageText.substring(0, 47) + '...' : messageText}',
+        'title': 'Marifactor',
+        'body': '$senderName +sent you a new message',
         'recipientId': receiverId,
         'fcmToken': fcmToken,
         'data': {
@@ -985,7 +985,6 @@ class FirestoreService {
       print('Message sent with ID: ${messageRef.id}');
 
       // DEBUG: Call our debug method
-      await debugMessageNotification(receiverId, text);
 
       // Also call the notification manager method
       try {

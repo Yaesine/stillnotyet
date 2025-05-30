@@ -1,10 +1,11 @@
-// lib/screens/splash_screen.dart - ENHANCED DARK THEME VERSION
+// lib/screens/splash_screen.dart - ENHANCED DARK THEME VERSION WITH FCM TOKEN MANAGEMENT
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/FCMTokenFixer.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
@@ -59,18 +60,47 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   Future<void> _initializeAuth() async {
     try {
       final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+
       // Non-blocking auth initialization
       authProvider.initializeAuth();
+
+      // Check if user is already logged in
+      if (authProvider.isLoggedIn) {
+        print('User is logged in during splash, ensuring FCM token...');
+
+        // Ensure FCM token in background without blocking UI
+        Future.microtask(() async {
+          try {
+            await FCMTokenFixer.ensureTokenOnStartup();
+            await authProvider.ensureFCMToken();
+            print('FCM token ensured during splash screen');
+          } catch (e) {
+            print('Error ensuring FCM token during splash: $e');
+            // Don't block app startup if token fails
+          }
+        });
+      }
     } catch (e) {
       print('Background auth initialization error: $e');
     }
   }
 
-  void _navigateToNextScreen() {
+  void _navigateToNextScreen() async {
     if (!mounted) return;
 
     final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+
     if (authProvider.isLoggedIn) {
+      // Final check for FCM token before navigating to main screen
+      // This runs in parallel with navigation, won't delay it
+      Future.microtask(() async {
+        try {
+          await authProvider.ensureFCMToken();
+        } catch (e) {
+          print('Error in final FCM token check: $e');
+        }
+      });
+
       Navigator.pushReplacementNamed(context, '/main');
     } else {
       Navigator.pushReplacementNamed(context, '/login');

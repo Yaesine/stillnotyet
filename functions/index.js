@@ -401,6 +401,9 @@ exports.cleanupInvalidTokens = onSchedule("every 24 hours", async (event) => {
 });
 
 // Function to handle when a new message is created
+// Update your onNewMessage cloud function to prevent duplicate notifications
+
+// Function to handle when a new message is created
 exports.onNewMessage = onDocumentCreated("messages/{messageId}", async (event) => {
   const snapshot = event.data;
   const context = event.params;
@@ -414,13 +417,26 @@ exports.onNewMessage = onDocumentCreated("messages/{messageId}", async (event) =
   try {
     console.log(`New message detected from ${message.senderId} to ${message.receiverId}`);
 
+    // Check if we've already created a notification for this message
+    // This prevents duplicate notifications if the function is triggered multiple times
+    const existingNotifications = await admin.firestore()
+      .collection('notifications')
+      .where('data.messageId', '==', context.params.messageId)
+      .limit(1)
+      .get();
+
+    if (!existingNotifications.empty) {
+      console.log(`Notification already exists for message ${context.params.messageId}, skipping`);
+      return null;
+    }
+
     // Get sender details
-    const senderDoc = await admin.firestore().collection("users").doc(message.senderId).get();
+    const senderDoc = await admin.firestore().collection('users').doc(message.senderId).get();
     const senderData = senderDoc.data() || {};
-    const senderName = senderData.name || "Someone";
+    const senderName = senderData.name || 'Someone';
 
     // Get recipient token
-    const recipientDoc = await admin.firestore().collection("users").doc(message.receiverId).get();
+    const recipientDoc = await admin.firestore().collection('users').doc(message.receiverId).get();
     if (!recipientDoc.exists) {
       console.log(`Recipient ${message.receiverId} not found`);
       return null;
@@ -435,29 +451,31 @@ exports.onNewMessage = onDocumentCreated("messages/{messageId}", async (event) =
       `${messageText.substring(0, 47)}...` :
       messageText;
 
-    // Create notification document
-    await admin.firestore().collection("notifications").add({
-      type: "message",
-      title: "💌 New Message",
-      body: `${senderName}: ${truncatedText}`,
+    // Create notification document with a unique ID to prevent duplicates
+    const notificationId = `msg_${context.params.messageId}_${Date.now()}`;
+
+    await admin.firestore().collection('notifications').doc(notificationId).set({
+      type: 'message',
+      title: 'Marifactor',
+      body: `${senderName} sent you a message`,
       recipientId: message.receiverId,
       fcmToken: fcmToken,
       data: {
-        type: "message",
+        type: 'message',
         senderId: message.senderId,
-        messageId: context.params.messageId,
+        messageId: context.params.messageId,  // Include message ID to track duplicates
         messageText: truncatedText,
         timestamp: Date.now().toString(),
       },
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      status: fcmToken ? "pending" : "pending_token",
-      platform: recipientData.platform || "unknown",
+      status: fcmToken ? 'pending' : 'pending_token',
+      platform: recipientData.platform || 'unknown',
     });
 
-    console.log(`Created message notification for ${message.receiverId} from ${senderName}`);
+    console.log(`Created message notification ${notificationId} for ${message.receiverId} from ${senderName}`);
     return null;
   } catch (error) {
-    console.error("Error creating message notification:", error);
+    console.error('Error creating message notification:', error);
     return null;
   }
 });

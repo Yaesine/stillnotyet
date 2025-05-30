@@ -1,7 +1,9 @@
-// lib/services/notifications_service.dart
+// lib/services/notifications_service.dart - Updated with automatic token management
+
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 // This needs to be a top-level function
@@ -52,13 +54,79 @@ class NotificationsService {
         // Note: You'll handle this navigation in NotificationManager
       }
 
-      // Get the FCM token and print it for debugging
-      String? token = await _firebaseMessaging.getToken();
-      print('FCM Token: $token');
+      // Automatically get and save FCM token
+      await _autoSaveToken();
+
+      // Listen for token refresh
+      _firebaseMessaging.onTokenRefresh.listen((newToken) async {
+        print('FCM Token refreshed: $newToken');
+        await _saveTokenToFirestore(newToken);
+      });
 
       print('Notification services initialized successfully');
     } catch (e) {
       print('Error initializing notification services: $e');
+    }
+  }
+
+  // Automatically save token on initialization
+  Future<void> _autoSaveToken() async {
+    try {
+      String? token = await _firebaseMessaging.getToken();
+      if (token != null) {
+        print('FCM Token obtained: $token');
+        await _saveTokenToFirestore(token);
+      } else {
+        print('Failed to obtain FCM token');
+      }
+    } catch (e) {
+      print('Error auto-saving FCM token: $e');
+    }
+  }
+
+  // Save token to Firestore
+  Future<void> _saveTokenToFirestore(String token) async {
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        print('Cannot save FCM token: No authenticated user');
+        return;
+      }
+
+      // Check if token has changed
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final existingToken = (userDoc.data() as Map<String, dynamic>?)?['fcmToken'];
+        if (existingToken == token) {
+          print('FCM token unchanged, skipping update');
+          return;
+        }
+      }
+
+      await _firestore.collection('users').doc(userId).update({
+        'fcmToken': token,
+        'tokenUpdatedAt': FieldValue.serverTimestamp(),
+        'platform': 'ios',
+      });
+
+      print('FCM token saved to Firestore successfully');
+    } catch (e) {
+      print('Error saving FCM token to Firestore: $e');
+
+      // Try with merge as fallback
+      try {
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null) {
+          await _firestore.collection('users').doc(userId).set({
+            'fcmToken': token,
+            'tokenUpdatedAt': FieldValue.serverTimestamp(),
+            'platform': 'ios',
+          }, SetOptions(merge: true));
+          print('FCM token saved with merge option');
+        }
+      } catch (e2) {
+        print('Error saving FCM token with merge: $e2');
+      }
     }
   }
 
