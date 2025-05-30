@@ -17,6 +17,7 @@ class NotificationManager {
 
   // A flag to track if the manager has been initialized
   bool _isInitialized = false;
+  final Map<String, DateTime> _recentNotifications = {};
 
   // Initialize notifications with better error handling
   Future<void> initialize() async {
@@ -72,8 +73,8 @@ class NotificationManager {
       print('Error handling foreground message: $e');
     }
   }
-
   // Show in-app notification with improved UI and error handling
+// Show in-app notification
   void _showInAppNotification(RemoteMessage message) {
     final context = navigatorKey.currentContext;
     if (context == null) {
@@ -82,7 +83,6 @@ class NotificationManager {
     }
 
     try {
-      // Get theme information
       final isDarkMode = Theme.of(context).brightness == Brightness.dark;
       final backgroundColor = isDarkMode ? AppColors.darkCard : Colors.white;
       final textColor = isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary;
@@ -121,7 +121,6 @@ class NotificationManager {
       print('Error showing in-app notification: $e');
     }
   }
-
   // Handle notification tap with improved logging and error handling
   void _handleRemoteNotificationTap(RemoteMessage message) {
     try {
@@ -138,7 +137,6 @@ class NotificationManager {
       print('Error handling notification tap: $e');
     }
   }
-
   // Navigate based on notification type with better routing
   void _navigateBasedOnType(String? type, String? id) {
     if (type == null) {
@@ -151,40 +149,35 @@ class NotificationManager {
 
       switch (type) {
         case 'match':
-        // First make sure we're at the main screen, then navigate to the matches tab
           navigatorKey.currentState?.pushNamedAndRemoveUntil(
             '/main',
                 (route) => false,
-            arguments: {'initialTab': 3}, // Index of matches tab
+            arguments: {'initialTab': 3},
           );
           break;
 
         case 'message':
           if (id != null) {
-            // Get user data before navigating
             _getUserDataAndNavigate(id);
           } else {
-            // If no specific user ID, go to matches tab
             navigatorKey.currentState?.pushNamedAndRemoveUntil(
               '/main',
                   (route) => false,
-              arguments: {'initialTab': 3}, // Index of matches tab
+              arguments: {'initialTab': 3},
             );
           }
           break;
 
         case 'super_like':
         case 'profile_view':
-        // Navigate to likes tab
           navigatorKey.currentState?.pushNamedAndRemoveUntil(
             '/main',
                 (route) => false,
-            arguments: {'initialTab': 2}, // Index of likes tab
+            arguments: {'initialTab': 2},
           );
           break;
 
         default:
-        // Default to home tab
           navigatorKey.currentState?.pushNamedAndRemoveUntil(
             '/main',
                 (route) => false,
@@ -192,11 +185,9 @@ class NotificationManager {
       }
     } catch (e) {
       print('Error navigating from notification: $e');
-      // Fallback to main screen if navigation fails
       navigatorKey.currentState?.pushNamedAndRemoveUntil('/main', (route) => false);
     }
   }
-
   // Get user data and navigate to chat with better error handling
   Future<void> _getUserDataAndNavigate(String userId) async {
     try {
@@ -210,40 +201,21 @@ class NotificationManager {
       if (userDoc.exists) {
         final userData = userDoc.data();
         if (userData != null) {
-          // Extract the minimum data needed for chat
           final user = {
             'id': userId,
             'name': userData['name'] ?? 'User',
             'imageUrls': userData['imageUrls'] ?? [],
           };
 
-          // Navigate to chat screen with user data
           navigatorKey.currentState?.pushNamed(
             '/chat',
             arguments: user,
           );
           print('Navigated to chat with user: ${userData['name']}');
-        } else {
-          print('User data is null');
-          // Fallback to matches screen
-          navigatorKey.currentState?.pushNamedAndRemoveUntil(
-            '/main',
-                (route) => false,
-            arguments: {'initialTab': 3},
-          );
         }
-      } else {
-        print('User document does not exist');
-        // Fallback to matches screen
-        navigatorKey.currentState?.pushNamedAndRemoveUntil(
-          '/main',
-              (route) => false,
-          arguments: {'initialTab': 3},
-        );
       }
     } catch (e) {
       print('Error getting user data for navigation: $e');
-      // Fallback to main screen if all else fails
       navigatorKey.currentState?.pushNamedAndRemoveUntil('/main', (route) => false);
     }
   }
@@ -255,37 +227,19 @@ class NotificationManager {
       String? userId = FirebaseAuth.instance.currentUser?.uid;
 
       if (token != null && userId != null) {
-        print('Saving FCM token to Firestore: $token');
+        print('Saving FCM token to Firestore');
 
         await _firestore.collection('users').doc(userId).update({
           'fcmToken': token,
           'tokenTimestamp': FieldValue.serverTimestamp(),
-          'platform': 'ios', // Mark iOS platform specifically
-          'appVersion': '1.0.0', // Add app version for tracking
+          'platform': 'ios',
+          'appVersion': '1.0.0',
         });
 
         print('FCM Token saved to Firestore successfully');
-      } else {
-        print('Cannot save FCM token: token=$token, userId=$userId');
       }
     } catch (e) {
       print('Error saving FCM token to Firestore: $e');
-      // Retry once after a delay
-      await Future.delayed(Duration(seconds: 5));
-      try {
-        String? token = await _firebaseMessaging.getToken();
-        String? userId = FirebaseAuth.instance.currentUser?.uid;
-
-        if (token != null && userId != null) {
-          await _firestore.collection('users').doc(userId).update({
-            'fcmToken': token,
-            'tokenTimestamp': FieldValue.serverTimestamp(),
-          });
-          print('FCM Token saved to Firestore on retry');
-        }
-      } catch (retryError) {
-        print('Error on retry saving FCM token: $retryError');
-      }
     }
   }
 
@@ -533,30 +487,6 @@ class NotificationManager {
 
       if (fcmToken == null || fcmToken.isEmpty) {
         print('No FCM token found for user: $userId');
-
-        // For testing purposes only: If the user doesn't have a token,
-        // provide a fallback token for debug users
-        if (userId == 'M1uABjXQ13dPxiTGVgi7UI6NKYf1' || userId.startsWith('test_user')) {
-          String debugToken = await _firebaseMessaging.getToken() ?? '';
-          print('Using debug token for testing: $debugToken');
-
-          // Only update test user documents
-          if (userId.startsWith('test_user')) {
-            try {
-              await _firestore.collection('users').doc(userId).update({
-                'fcmToken': debugToken,
-                'tokenTimestamp': FieldValue.serverTimestamp(),
-                'platform': 'ios', // Assuming iOS for testing
-              });
-              print('Updated test user with debug token');
-            } catch (e) {
-              print('Error updating test user token: $e');
-            }
-          }
-
-          return debugToken;
-        }
-
         return null;
       }
 
@@ -567,7 +497,6 @@ class NotificationManager {
       return null;
     }
   }
-
 
   // Send profile view notification with improved handling
   Future<void> sendProfileViewNotification(String profileOwnerId, String viewerName) async {
@@ -617,10 +546,10 @@ class NotificationManager {
         'title': title,
         'body': body,
         'recipientId': recipientId,
-        'fcmToken': null, // No token available
+        'fcmToken': null,
         'data': data,
         'timestamp': FieldValue.serverTimestamp(),
-        'status': 'pending_token', // Special status to indicate waiting for token
+        'status': 'pending_token',
         'platform': 'unknown',
         'priority': 'high',
       });
@@ -639,18 +568,30 @@ class NotificationManager {
     try {
       print('Preparing message notification for $recipientId from $senderName');
 
+      // Create a unique key for this notification
+      final notificationKey = 'msg_${recipientId}_${FirebaseAuth.instance.currentUser?.uid}';
+
+      // Check if we recently created a similar notification
+      if (_recentNotifications.containsKey(notificationKey)) {
+        final lastCreated = _recentNotifications[notificationKey]!;
+        final timeDiff = DateTime.now().difference(lastCreated).inSeconds;
+
+        if (timeDiff < 5) {
+          print('Similar notification created ${timeDiff}s ago, skipping duplicate');
+          return;
+        }
+      }
+
       // Use the new method to get the FCM token
       String? fcmToken = await _getFcmTokenForUser(recipientId);
 
       if (fcmToken == null || fcmToken.isEmpty) {
         print('Cannot send message notification: FCM token not found for $recipientId');
 
-        // Still create a notification document even without a token
-        // This way when the user gets a token, pending notifications can be processed
         await _createNotificationDocumentWithoutToken(
           type: 'message',
-          title: '💌 New Message',
-          body: '$senderName: ${messageText.length > 50 ? messageText.substring(0, 47) + '...' : messageText}',
+          title: 'Marifactor',
+          body: '$senderName sent you a message',
           recipientId: recipientId,
           data: {
             'type': 'message',
@@ -659,26 +600,40 @@ class NotificationManager {
             'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
           },
         );
-
         return;
       }
 
-      // Original notification creation with token
-      await _createNotificationDocument(
-        type: 'message',
-        title: '💌 New Message',
-        body: '$senderName: ${messageText.length > 50 ? messageText.substring(0, 47) + '...' : messageText}',
-        recipientId: recipientId,
-        fcmToken: fcmToken,
-        data: {
+      // Create a unique document ID to prevent duplicates
+      final uniqueId = '${DateTime.now().millisecondsSinceEpoch}_${recipientId}_msg';
+
+      await _firestore.collection('notifications').doc(uniqueId).set({
+        'type': 'message',
+        'title': 'Marifactor',
+        'body': '$senderName sent you a message',
+        'recipientId': recipientId,
+        'fcmToken': fcmToken,
+        'data': {
           'type': 'message',
           'senderId': FirebaseAuth.instance.currentUser?.uid,
           'messageText': messageText.length > 100 ? messageText.substring(0, 97) + '...' : messageText,
           'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
         },
-      );
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'platform': 'ios',
+        'priority': 'high',
+        'createdAt': DateTime.now().toIso8601String(),
+      });
 
-      print('Message notification prepared for $recipientId');
+      // Update recent notifications tracker
+      _recentNotifications[notificationKey] = DateTime.now();
+
+      // Clean up old entries after 60 seconds
+      Future.delayed(Duration(seconds: 60), () {
+        _recentNotifications.remove(notificationKey);
+      });
+
+      print('Message notification prepared for $recipientId with ID: $uniqueId');
     } catch (e) {
       print('Error preparing message notification: $e');
     }

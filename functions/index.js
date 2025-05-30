@@ -7,135 +7,24 @@ const {onCall} = require("firebase-functions/v2/https");
 
 admin.initializeApp();
 
-exports.sendIosNotification = onDocumentCreated("notifications/{notificationId}", async (event) => {
-  const snapshot = event.data;
-  const context = event.params;
-  const notification = snapshot.data();
-  console.log(`Processing iOS notification: ${JSON.stringify(notification, null, 2)}`);
-
-  // Only process iOS notifications
-  if (notification.platform !== "ios") {
-    console.log("Not an iOS notification, skipping");
-    return null;
-  }
-
-  // Skip if notification has already been sent
-  if (notification.status !== "pending" && notification.status !== "pending_token") {
-    console.log("Notification already processed:", notification.status);
-    return null;
-  }
-
-  try {
-    // Use debug token for testing if no token available
-    if (!notification.fcmToken) {
-      // Check if this is a test user
-      const isTestUser = notification.recipientId === "M1uABjXQ13dPxiTGVgi7UI6NKYf1" ||
-                          notification.recipientId === "6fbbrljd7ehgs7Ea1DFRdvnC5Jn1";
-
-      if (isTestUser) {
-        // Use your device's token for testing
-        const debugToken = "fXcFe_YBeEQ6q4fm-mjNmX:APA91bEbsy3KtFJ1c9ZRgYowrtEsSgBa0MXOG6_2LU5_927Ueiy8nYSUYyroAnUX2ieHo5FfNwWQMk4LSgZ7H1Dtxz_i7yDAIp-GbLZHCXTzncNBQicF-jo";
-
-        console.log(`Using debug token for test user: ${notification.recipientId}`);
-        notification.fcmToken = debugToken;
-        await snapshot.ref.update({fcmToken: debugToken});
-      } else {
-        console.log("No FCM token available for notification:", context.params.notificationId);
-        await snapshot.ref.update({
-          status: "pending_token",
-          processedAt: admin.firestore.FieldValue.serverTimestamp(),
-          error: "No FCM token available",
-        });
-        return null;
-      }
-    }
-
-    // iOS-specific notification format
-    const message = {
-      token: notification.fcmToken,
-      notification: {
-        title: notification.title,
-        body: notification.body,
-      },
-      // iOS-specific configuration - More conservative format
-      apns: {
-        headers: {
-          "apns-priority": "10",
-          "apns-push-type": "alert",
-        },
-        payload: {
-          aps: {
-            alert: {
-              title: notification.title,
-              body: notification.body,
-            },
-            sound: "default",
-            badge: 1,
-          },
-          // Include data in the APNS payload
-          notificationType: notification.data.type || "general",
-          senderId: notification.data.senderId || "",
-          timestamp: notification.data.timestamp || "",
-        },
-      },
-      // Include the data payload for the app to process
-      data: {
-        type: notification.data.type || "general",
-        senderId: notification.data.senderId || "",
-        timestamp: notification.data.timestamp || "",
-      },
-    };
-
-    console.log("Sending iOS notification with message:", JSON.stringify(message, null, 2));
-
-    // Send the notification
-    const response = await admin.messaging().send(message);
-    console.log("Successfully sent iOS notification:", response);
-
-    // Update status to sent
-    await snapshot.ref.update({
-      status: "sent",
-      sentAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return response;
-  } catch (error) {
-    console.error("Error sending iOS notification:", error);
-    console.error("Error code:", error.code);
-    console.error("Error details:", error.details);
-
-    // Update status to error
-    await snapshot.ref.update({
-      status: "error",
-      error: error.message,
-      errorCode: error.code || "unknown",
-      errorTime: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    return null;
-  }
-});
-
-// Listen for new notification documents in Firestore
 exports.sendNotification = onDocumentCreated("notifications/{notificationId}", async (event) => {
   const snapshot = event.data;
-  const context = event.params;
   const notification = snapshot.data();
-  console.log(`Processing new notification: ${JSON.stringify(notification, null, 2)}`);
 
-  // Skip if notification has already been sent or has no token
+  console.log(`Processing notification: ${JSON.stringify(notification, null, 2)}`);
+
+  // Skip if notification has already been sent
   if (notification.status !== "pending" && notification.status !== "pending_token") {
     console.log(`Notification already processed: status=${notification.status}`);
     return null;
   }
 
   try {
-    // Check if this is a test user and we should use a debug token
+    // Check for test users
     const isTestUser = notification.recipientId.includes("test_") ||
-                        notification.recipientId === "6fbbrljd7ehgs7Ea1DFRdvnC5Jn1" ||
-                        notification.recipientId === "M1uABjXQ13dPxiTGVgi7UI6NKYf1";
+                      notification.recipientId === "6fbbrljd7ehgs7Ea1DFRdvnC5Jn1" ||
+                      notification.recipientId === "M1uABjXQ13dPxiTGVgi7UI6NKYf1";
 
-    // Use your device token for testing if recipient is a test user without token
     const debugToken = "fXcFe_YBeEQ6q4fm-mjNmX:APA91bEbsy3KtFJ1c9ZRgYowrtEsSgBa0MXOG6_2LU5_927Ueiy8nYSUYyroAnUX2ieHo5FfNwWQMk4LSgZ7H1Dtxz_i7yDAIp-GbLZHCXTzncNBQicF-jo";
 
     if (!notification.fcmToken && isTestUser) {
@@ -144,7 +33,7 @@ exports.sendNotification = onDocumentCreated("notifications/{notificationId}", a
       await snapshot.ref.update({fcmToken: debugToken});
     }
 
-    // If still no token, check the user document for an updated token
+    // If still no token, check the user document
     if (!notification.fcmToken) {
       console.log(`Looking for token in user document: ${notification.recipientId}`);
 
@@ -152,16 +41,16 @@ exports.sendNotification = onDocumentCreated("notifications/{notificationId}", a
       if (userDoc.exists) {
         const userData = userDoc.data();
         if (userData.fcmToken) {
-          console.log(`Found token in user document: ${userData.fcmToken.substring(0, 20)}...`);
+          console.log(`Found token in user document`);
           notification.fcmToken = userData.fcmToken;
           await snapshot.ref.update({fcmToken: userData.fcmToken});
         }
       }
     }
 
-    // Skip if no token available after all attempts
+    // Skip if no token available
     if (!notification.fcmToken) {
-      console.log("No FCM token available for notification:", context.params.notificationId);
+      console.log("No FCM token available for notification:", event.params.notificationId);
       await snapshot.ref.update({
         status: "pending_token",
         processedAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -170,7 +59,7 @@ exports.sendNotification = onDocumentCreated("notifications/{notificationId}", a
       return null;
     }
 
-    // Prepare FCM message with enhanced iOS configuration
+    // Prepare FCM message
     const message = {
       token: notification.fcmToken,
       notification: {
@@ -178,7 +67,7 @@ exports.sendNotification = onDocumentCreated("notifications/{notificationId}", a
         body: notification.body,
       },
       data: notification.data || {},
-      // iOS specific configuration - CRITICAL FOR iOS NOTIFICATIONS
+      // iOS specific configuration
       apns: {
         payload: {
           aps: {
@@ -190,14 +79,13 @@ exports.sendNotification = onDocumentCreated("notifications/{notificationId}", a
             "badge": 1,
             "content-available": 1,
             "mutable-content": 1,
-            "thread-id": notification.data.type || "default", // Group by notification type
-            "category": notification.data.type || "DEFAULT", // For notification actions
+            "thread-id": notification.data.type || "default",
+            "category": notification.data.type || "DEFAULT",
           },
-          // Include the data payload for iOS
           ...notification.data,
         },
         headers: {
-          "apns-priority": "10", // High priority
+          "apns-priority": "10",
           "apns-push-type": "alert",
         },
       },
@@ -211,12 +99,6 @@ exports.sendNotification = onDocumentCreated("notifications/{notificationId}", a
           defaultSound: true,
           visibility: "public",
           clickAction: "FLUTTER_NOTIFICATION_CLICK",
-        },
-      },
-      // Set high priority for all platforms
-      webpush: {
-        headers: {
-          Urgency: "high",
         },
       },
     };
@@ -248,11 +130,10 @@ exports.sendNotification = onDocumentCreated("notifications/{notificationId}", a
       errorTime: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    // If the token is invalid, mark it for cleanup
+    // Handle invalid tokens
     if (error.code === "messaging/invalid-registration-token" ||
-          error.code === "messaging/registration-token-not-registered") {
+        error.code === "messaging/registration-token-not-registered") {
       try {
-        // Mark the token as invalid in the user document
         await admin.firestore().collection("users").doc(notification.recipientId).update({
           fcmTokenValid: false,
           fcmTokenError: error.code,
@@ -264,6 +145,102 @@ exports.sendNotification = onDocumentCreated("notifications/{notificationId}", a
       }
     }
 
+    return null;
+  }
+});
+
+// Replace your onNewMessage function with this corrected version:
+
+exports.onNewMessage = onDocumentCreated("messages/{messageId}", async (event) => {
+  const snapshot = event.data;
+  const context = event.params;
+  const message = snapshot.data();
+
+  // Only send notification if the message isn't from the recipient
+  if (!message || message.senderId === message.receiverId) {
+    return null;
+  }
+
+  try {
+    console.log(`New message detected from ${message.senderId} to ${message.receiverId}`);
+
+    // CRITICAL: Check if notification already exists for this message
+    const existingNotifications = await admin.firestore()
+      .collection("notifications")
+      .where("data.messageId", "==", context.messageId) // ← FIXED: context.messageId NOT context.params.messageId
+      .limit(1)
+      .get();
+
+    if (!existingNotifications.empty) {
+      console.log(`Notification already exists for message ${context.messageId}, skipping`); // ← FIXED
+      return null;
+    }
+
+    // Check if a notification was created in the last 5 seconds for this sender/receiver pair
+    const fiveSecondsAgo = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() - 5000),
+    );
+
+    const recentNotifications = await admin.firestore()
+      .collection("notifications")
+      .where("recipientId", "==", message.receiverId)
+      .where("data.senderId", "==", message.senderId)
+      .where("type", "==", "message")
+      .where("timestamp", ">", fiveSecondsAgo)
+      .limit(1)
+      .get();
+
+    if (!recentNotifications.empty) {
+      console.log(`Recent notification already exists, skipping duplicate`);
+      return null;
+    }
+
+    // Get sender details
+    const senderDoc = await admin.firestore().collection("users").doc(message.senderId).get();
+    const senderData = senderDoc.data() || {};
+    const senderName = senderData.name || "Someone";
+
+    // Get recipient token
+    const recipientDoc = await admin.firestore().collection("users").doc(message.receiverId).get();
+    if (!recipientDoc.exists) {
+      console.log(`Recipient ${message.receiverId} not found`);
+      return null;
+    }
+
+    const recipientData = recipientDoc.data();
+    const fcmToken = recipientData.fcmToken;
+
+    // Truncate message text
+    const messageText = message.text || "";
+    const truncatedText = messageText.length > 50 ?
+      `${messageText.substring(0, 47)}...` :
+      messageText;
+
+    // Create notification with unique ID including timestamp
+    const notificationId = `msg_${context.messageId}_${Date.now()}`; // ← FIXED
+
+    await admin.firestore().collection("notifications").doc(notificationId).set({
+      type: "message",
+      title: "Marifactor",
+      body: `${senderName} sent you a message`,
+      recipientId: message.receiverId,
+      fcmToken: fcmToken,
+      data: {
+        type: "message",
+        senderId: message.senderId,
+        messageId: context.messageId, // ← FIXED
+        messageText: truncatedText,
+        timestamp: Date.now().toString(),
+      },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      status: fcmToken ? "pending" : "pending_token",
+      platform: recipientData.platform || "unknown",
+    });
+
+    console.log(`Created message notification ${notificationId} for ${message.receiverId} from ${senderName}`);
+    return null;
+  } catch (error) {
+    console.error("Error creating message notification:", error);
     return null;
   }
 });
@@ -398,86 +375,6 @@ exports.cleanupInvalidTokens = onSchedule("every 24 hours", async (event) => {
   await Promise.all(updatePromises);
   console.log(`Cleaned up tokens for ${updatePromises.length} users`);
   return null;
-});
-
-// Function to handle when a new message is created
-// Update your onNewMessage cloud function to prevent duplicate notifications
-
-// Function to handle when a new message is created
-exports.onNewMessage = onDocumentCreated("messages/{messageId}", async (event) => {
-  const snapshot = event.data;
-  const context = event.params;
-  const message = snapshot.data();
-
-  // Only send notification if the message isn't from the recipient
-  if (!message || message.senderId === message.receiverId) {
-    return null;
-  }
-
-  try {
-    console.log(`New message detected from ${message.senderId} to ${message.receiverId}`);
-
-    // Check if we've already created a notification for this message
-    // This prevents duplicate notifications if the function is triggered multiple times
-    const existingNotifications = await admin.firestore()
-      .collection('notifications')
-      .where('data.messageId', '==', context.params.messageId)
-      .limit(1)
-      .get();
-
-    if (!existingNotifications.empty) {
-      console.log(`Notification already exists for message ${context.params.messageId}, skipping`);
-      return null;
-    }
-
-    // Get sender details
-    const senderDoc = await admin.firestore().collection('users').doc(message.senderId).get();
-    const senderData = senderDoc.data() || {};
-    const senderName = senderData.name || 'Someone';
-
-    // Get recipient token
-    const recipientDoc = await admin.firestore().collection('users').doc(message.receiverId).get();
-    if (!recipientDoc.exists) {
-      console.log(`Recipient ${message.receiverId} not found`);
-      return null;
-    }
-
-    const recipientData = recipientDoc.data();
-    const fcmToken = recipientData.fcmToken;
-
-    // Truncate message text for notification
-    const messageText = message.text || "";
-    const truncatedText = messageText.length > 50 ?
-      `${messageText.substring(0, 47)}...` :
-      messageText;
-
-    // Create notification document with a unique ID to prevent duplicates
-    const notificationId = `msg_${context.params.messageId}_${Date.now()}`;
-
-    await admin.firestore().collection('notifications').doc(notificationId).set({
-      type: 'message',
-      title: 'Marifactor',
-      body: `${senderName} sent you a message`,
-      recipientId: message.receiverId,
-      fcmToken: fcmToken,
-      data: {
-        type: 'message',
-        senderId: message.senderId,
-        messageId: context.params.messageId,  // Include message ID to track duplicates
-        messageText: truncatedText,
-        timestamp: Date.now().toString(),
-      },
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      status: fcmToken ? 'pending' : 'pending_token',
-      platform: recipientData.platform || 'unknown',
-    });
-
-    console.log(`Created message notification ${notificationId} for ${message.receiverId} from ${senderName}`);
-    return null;
-  } catch (error) {
-    console.error('Error creating message notification:', error);
-    return null;
-  }
 });
 
 // Add a direct test notification function

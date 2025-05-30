@@ -103,7 +103,7 @@ class FirestoreService {
 
   // Add this method to your FirestoreService class for debugging
 
-  Future<void> debugMessageNotification(String receiverId, String messageText) async {
+/* Future<void> debugMessageNotification(String receiverId, String messageText) async {
     try {
       print('\n🔍 DEBUG: Starting message notification process');
       print('📤 Sender ID: $currentUserId');
@@ -181,7 +181,7 @@ class FirestoreService {
     } catch (e) {
       print('❌ DEBUG ERROR: $e');
     }
-  }
+  }*/
 
 
   // Create or update user profile
@@ -961,6 +961,9 @@ class FirestoreService {
 
   // Replace your sendMessage method in FirestoreService with this version
 
+  // In lib/services/firestore_service.dart
+// Update the sendMessage method to NOT create notifications
+
   Future<bool> sendMessage(String receiverId, String text) async {
     try {
       if (currentUserId == null) return false;
@@ -984,9 +987,6 @@ class FirestoreService {
 
       print('Message sent with ID: ${messageRef.id}');
 
-      // DEBUG: Call our debug method
-
-      // Also call the notification manager method
       try {
         // Get sender's name for the notification
         DocumentSnapshot senderDoc = await _usersCollection.doc(currentUserId).get();
@@ -999,17 +999,19 @@ class FirestoreService {
             senderName,
             text
         );
+
+        print('Message notification sent successfully');
       } catch (notificationError) {
         print('Error in notification process: $notificationError');
         // Don't fail the message send if notification fails
       }
-
       return true;
     } catch (e) {
       print('Error sending message: $e');
       return false;
     }
   }
+
 
   // Mark messages as read
   Future<void> markMessagesAsRead(String senderId) async {
@@ -1153,7 +1155,6 @@ class FirestoreService {
 
   // Add this helper method
   String _getConversationId(String userId1, String userId2) {
-    // Create a consistent conversation ID by sorting user IDs
     List<String> sortedIds = [userId1, userId2]..sort();
     return '${sortedIds[0]}_${sortedIds[1]}';
   }
