@@ -243,9 +243,86 @@ class NotificationManager {
     }
   }
 
-  // Create notification in Firestore (for cloud functions to send)
-  // Update the _createNotificationDocument method in NotificationManager to prevent duplicates
+  // Replace the sendMatchNotification method in lib/services/notification_manager.dart
 
+  Future<void> sendMatchNotification(String recipientId, String senderName) async {
+    try {
+      print('🎉 Preparing match notification for $recipientId from $senderName');
+
+      // Get the FCM token for the recipient
+      String? fcmToken = await _getFcmTokenForUser(recipientId);
+
+      // Create a unique ID to prevent duplicates
+      final notificationId = 'match_${DateTime.now().millisecondsSinceEpoch}_${recipientId}';
+
+      // Get recipient platform
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(recipientId).get();
+      Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
+      String platform = userData?['platform'] ?? 'ios';
+
+      if (fcmToken == null || fcmToken.isEmpty) {
+        print('❌ Cannot send match notification: FCM token not found for $recipientId');
+
+        // Create notification without token - will be processed later
+        await _firestore.collection('notifications').doc(notificationId).set({
+          'type': 'match',
+          'title': '🎉 New Match!',
+          'body': 'You and $senderName liked each other!',
+          'recipientId': recipientId,
+          'data': {
+            'type': 'match',
+            'senderId': FirebaseAuth.instance.currentUser?.uid,
+            'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          },
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'pending_token',
+          'platform': platform,
+          'priority': 'high',
+          'error': 'No FCM token available',
+        });
+        return;
+      }
+
+      // Create a high-priority notification document WITH token
+      await _firestore.collection('notifications').doc(notificationId).set({
+        'type': 'match',
+        'title': '🎉 New Match!',
+        'body': 'You and $senderName liked each other!',
+        'recipientId': recipientId,
+        'fcmToken': fcmToken,
+        'data': {
+          'type': 'match',
+          'senderId': FirebaseAuth.instance.currentUser?.uid,
+          'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'platform': platform,
+        'priority': 'high',
+        'urgent': true,
+        // DO NOT include error field when token exists!
+      });
+
+      print('✅ Match notification created with ID: $notificationId');
+
+      // Wait briefly and check status
+      await Future.delayed(Duration(seconds: 2));
+
+      DocumentSnapshot notificationDoc = await _firestore.collection('notifications').doc(notificationId).get();
+      if (notificationDoc.exists) {
+        Map<String, dynamic>? data = notificationDoc.data() as Map<String, dynamic>?;
+        print('📊 Notification status after 2s: ${data?['status']}');
+
+        if (data?['status'] == 'error') {
+          print('❌ Error in notification: ${data?['error']}');
+        }
+      }
+    } catch (e) {
+      print('❌ Error sending match notification: $e');
+    }
+  }
+
+// Also update the _createNotificationDocument method to fix the platform issue
   Future<void> _createNotificationDocument({
     required String type,
     required String title,
@@ -259,6 +336,11 @@ class NotificationManager {
         print('Cannot create notification: FCM token is null');
         return;
       }
+
+      // Get recipient platform
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(recipientId).get();
+      Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
+      String platform = userData?['platform'] ?? 'ios';
 
       // Create a unique notification ID to prevent duplicates
       final notificationId = 'notification_${type}_${DateTime.now().millisecondsSinceEpoch}_${recipientId}';
@@ -292,9 +374,9 @@ class NotificationManager {
         'data': data,
         'timestamp': FieldValue.serverTimestamp(),
         'status': 'pending',
-        'platform': 'ios', // Specify iOS platform for platform-specific formatting
-        'priority': 'high', // Set high priority for important notifications
-        'createdAt': DateTime.now().toIso8601String(), // For debugging
+        'platform': platform, // Use actual platform instead of hardcoded 'ios'
+        'priority': 'high',
+        'createdAt': DateTime.now().toIso8601String(),
       });
 
       print('Notification document created for $recipientId: $type');
@@ -302,75 +384,6 @@ class NotificationManager {
       print('Error creating notification document: $e');
     }
   }
-
-  // Send match notification with improved handling
-// Replace the sendMatchNotification method in lib/services/notification_manager.dart
-  Future<void> sendMatchNotification(String recipientId, String senderName) async {
-    try {
-      print('🎉 Preparing match notification for $recipientId from $senderName');
-
-      // Get the FCM token for the recipient
-      String? fcmToken = await _getFcmTokenForUser(recipientId);
-
-      if (fcmToken == null || fcmToken.isEmpty) {
-        print('❌ Cannot send match notification: FCM token not found for $recipientId');
-
-        // Create notification without token - will be processed later
-        await _createNotificationDocumentWithoutToken(
-          type: 'match',
-          title: '🎉 New Match!',
-          body: 'You and $senderName liked each other!',
-          recipientId: recipientId,
-          data: {
-            'type': 'match',
-            'senderId': FirebaseAuth.instance.currentUser?.uid,
-            'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
-          },
-        );
-        return;
-      }
-
-      // Create a unique ID to prevent duplicates
-      final notificationId = 'match_${DateTime.now().millisecondsSinceEpoch}_${recipientId}';
-
-      // Create a high-priority notification document
-      await _firestore.collection('notifications').doc(notificationId).set({
-        'type': 'match',
-        'title': '🎉 New Match!',
-        'body': 'You and $senderName liked each other!',
-        'recipientId': recipientId,
-        'fcmToken': fcmToken,
-        'data': {
-          'type': 'match',
-          'senderId': FirebaseAuth.instance.currentUser?.uid,
-          'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
-        },
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'pending',
-        'platform': 'ios',
-        'priority': 'high',
-        'urgent': true, // Special flag for high-priority notifications
-      });
-
-      print('✅ Match notification created with ID: $notificationId');
-
-      // Wait briefly and check status
-      await Future.delayed(Duration(seconds: 2));
-
-      DocumentSnapshot notificationDoc = await _firestore.collection('notifications').doc(notificationId).get();
-      if (notificationDoc.exists) {
-        Map<String, dynamic>? data = notificationDoc.data() as Map<String, dynamic>?;
-        print('📊 Notification status after 2s: ${data?['status']}');
-
-        if (data?['status'] == 'error') {
-          print('❌ Error in notification: ${data?['error']}');
-        }
-      }
-    } catch (e) {
-      print('❌ Error sending match notification: $e');
-    }
-  }
-  // Add this function to your notification_manager.dart
 
   Future<void> sendTestNotification() async {
     try {
@@ -611,7 +624,7 @@ class NotificationManager {
         await _createNotificationDocumentWithoutToken(
           type: 'message',
           title: 'Marifactor',
-          body: '$senderName sent you a message',
+          body: '$senderName sent you a new message',
           recipientId: recipientId,
           data: {
             'type': 'message',
@@ -629,7 +642,7 @@ class NotificationManager {
       await _firestore.collection('notifications').doc(uniqueId).set({
         'type': 'message',
         'title': 'Marifactor',
-        'body': '$senderName sent you a message',
+        'body': '$senderName sent you a new message',
         'recipientId': recipientId,
         'fcmToken': fcmToken,
         'data': {
