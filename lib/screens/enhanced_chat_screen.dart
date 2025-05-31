@@ -556,7 +556,7 @@ class _EnhancedChatScreenState extends State<EnhancedChatScreen> with SingleTick
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               _matchedUser != null
-                  ? 'You and ${_matchedUser!.name} have liked each other. Start the conversation now!'
+                  ? 'You have got a new match 🎉🎉🎉. Start the conversation now!'
                   : 'You matched with this person. Start the conversation now!',
               textAlign: TextAlign.center,
               style: TextStyle(

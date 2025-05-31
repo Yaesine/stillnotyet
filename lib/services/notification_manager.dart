@@ -266,8 +266,8 @@ class NotificationManager {
         // Create notification without token - will be processed later
         await _firestore.collection('notifications').doc(notificationId).set({
           'type': 'match',
-          'title': '🎉 New Match!',
-          'body': 'You and $senderName liked each other!',
+          'title': 'Marifecto',
+          'body': 'You have got a new match 🎉🎉🎉',
           'recipientId': recipientId,
           'data': {
             'type': 'match',
@@ -286,8 +286,8 @@ class NotificationManager {
       // Create a high-priority notification document WITH token
       await _firestore.collection('notifications').doc(notificationId).set({
         'type': 'match',
-        'title': '🎉 New Match!',
-        'body': 'You and $senderName liked each other!',
+        'title': 'Marifecto',
+        'body': 'You have got a new match 🎉🎉🎉',
         'recipientId': recipientId,
         'fcmToken': fcmToken,
         'data': {

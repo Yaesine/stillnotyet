@@ -196,8 +196,8 @@ class FCMTokenFixer {
       // Create a test match notification
       await FirebaseFirestore.instance.collection('notifications').add({
         'type': 'match',
-        'title': '🎉 New Match!',
-        'body': 'You and Someone liked each other!',
+        'title': 'Marifecto',
+        'body': 'You have got a new match 🎉🎉🎉',
         'recipientId': currentUser.uid,
         'fcmToken': token,
         'data': {

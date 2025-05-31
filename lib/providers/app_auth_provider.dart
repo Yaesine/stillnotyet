@@ -255,6 +255,8 @@ class AppAuthProvider with ChangeNotifier {
   }
 
   // Register new user
+// Update the register method in lib/providers/app_auth_provider.dart
+
   Future<bool> register(String name, String email, String password) async {
     try {
       _errorMessage = null;
@@ -264,6 +266,25 @@ class AppAuthProvider with ChangeNotifier {
       final formattedEmail = email.trim().toLowerCase();
 
       print('Starting registration for $formattedEmail...');
+
+      // First, get the FCM token BEFORE creating the account
+      String? fcmToken;
+      try {
+        // Request notification permission first
+        NotificationSettings settings = await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+
+        if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+            settings.authorizationStatus == AuthorizationStatus.provisional) {
+          fcmToken = await FirebaseMessaging.instance.getToken();
+          print('Got FCM token during registration: ${fcmToken?.substring(0, 20)}...');
+        }
+      } catch (e) {
+        print('Error getting FCM token during registration: $e');
+      }
 
       final tempResult = await _auth.createUserWithEmailAndPassword(
         email: formattedEmail,
@@ -286,8 +307,9 @@ class AppAuthProvider with ChangeNotifier {
       print('Temporary signout to avoid PigeonUserDetails error');
 
       try {
-        await _firestoreService.createNewUser(userId, name, formattedEmail);
-        print('Firestore profile created for user: $name ($formattedEmail)');
+        // Pass FCM token to createNewUser
+        await _firestoreService.createNewUserWithToken(userId, name, formattedEmail, fcmToken);
+        print('Firestore profile created with FCM token for user: $name ($formattedEmail)');
       } catch (e) {
         print('Error creating Firestore profile: $e');
       }
@@ -309,8 +331,10 @@ class AppAuthProvider with ChangeNotifier {
 
         print('Successfully signed back in as: $userId');
 
-        // Ensure FCM token immediately after registration
-        await ensureFCMToken();
+        // Ensure FCM token is saved after sign in
+        if (fcmToken != null) {
+          await _updateFCMToken(fcmToken);
+        }
       } catch (e) {
         print('Error signing back in: $e');
         _errorMessage = 'Account created but login failed. Please try logging in manually.';
@@ -333,7 +357,7 @@ class AppAuthProvider with ChangeNotifier {
         print('Error saving to SharedPreferences: $e');
       }
 
-      print('Registration completed successfully with bypass method');
+      print('Registration completed successfully with FCM token');
       _isLoading = false;
       notifyListeners();
       return true;
@@ -352,7 +376,6 @@ class AppAuthProvider with ChangeNotifier {
       return false;
     }
   }
-
   // Google Sign In using Firebase Auth directly
   Future<bool> signInWithGoogle() async {
     try {

@@ -287,7 +287,7 @@ class _ModernMatchAnimationState extends State<ModernMatchAnimation> with Single
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 32),
                             child: Text(
-                              "You and ${widget.matchedUser.name} have liked each other!",
+                              "You have got a new match 🎉🎉🎉",
                               textAlign: TextAlign.center,
                               style: const TextStyle(
                                 color: Colors.white,

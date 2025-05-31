@@ -818,6 +818,71 @@ class FirestoreService {
     }
   }
 
+  // Add this new method to lib/services/firestore_service.dart
+
+  Future<void> createNewUserWithToken(String userId, String name, String email, String? fcmToken) async {
+    try {
+      print('Creating user profile for $userId in Firestore with FCM token');
+
+      // Check if user already exists
+      DocumentSnapshot userDoc = await _usersCollection.doc(userId).get();
+      if (userDoc.exists) {
+        print('User profile for $userId already exists');
+        return;
+      }
+
+      // Create a default GeoPoint for Dubai area with slight randomization
+      final random = Random();
+      final lat = 25.2048 + (random.nextDouble() * 0.1 - 0.05); // Dubai latitude with variation
+      final lng = 55.2708 + (random.nextDouble() * 0.1 - 0.05); // Dubai longitude with variation
+
+      // Create basic user profile with FCM token
+      Map<String, dynamic> userData = {
+        'id': userId,
+        'name': name,
+        'email': email,
+        'age': 25,
+        'bio': '',
+        'imageUrls': [], // Empty array - no default picture
+        'interests': [],
+        'location': 'Dubai, UAE',
+        'geoPoint': GeoPoint(lat, lng),
+        'gender': '',
+        'lookingFor': '',
+        'distance': 50,
+        'ageRangeStart': 18,
+        'ageRangeEnd': 50,
+        'createdAt': FieldValue.serverTimestamp(),
+        'lastActive': FieldValue.serverTimestamp(),
+        'lastLocationUpdate': FieldValue.serverTimestamp(),
+        'profileComplete': false,
+        'platform': 'ios',
+        'appVersion': '1.0.0',
+      };
+
+      // Add FCM token if available
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        userData['fcmToken'] = fcmToken;
+        userData['tokenUpdatedAt'] = FieldValue.serverTimestamp();
+        userData['deviceInfo'] = {
+          'platform': 'iOS',
+          'lastTokenUpdate': DateTime.now().toIso8601String(),
+        };
+        print('Including FCM token in user creation');
+      }
+
+      // Use a transaction to ensure data consistency
+      await _firestore.runTransaction((transaction) async {
+        transaction.set(_usersCollection.doc(userId), userData);
+      });
+
+      print('User profile created successfully for $userId with FCM token');
+    } catch (e) {
+      print('Error creating user profile: $e');
+      throw e;
+    }
+  }
+
 // New helper method for creating match notifications directly
   Future<void> _createDirectMatchNotification(String recipientId, String senderName) async {
     try {
@@ -842,8 +907,8 @@ class FirestoreService {
       String notificationId = 'match_${DateTime.now().millisecondsSinceEpoch}_$recipientId';
       await _firestore.collection('notifications').doc(notificationId).set({
         'type': 'match',
-        'title': '🎉 New Match!',
-        'body': 'You and $senderName liked each other!',
+        'title': 'Marifecto',
+        'body': 'You\'ve got a new match 🎉🎉🎉',
         'recipientId': recipientId,
         'fcmToken': fcmToken,
         'data': {

@@ -253,14 +253,18 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      // FIRST - Ensure FCM token exists for new users
       await FCMTokenFixer.ensureTokenOnStartup();
 
+      // Force token refresh for new accounts
+      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
+      await authProvider.ensureFCMToken();
+
+      // Then continue with other initialization
       _initializeNotificationHandler();
 
-      // First load user data and ui components
+      // Load user data and ui components
       final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final authProvider = Provider.of<AppAuthProvider>(context, listen: false);
-      await authProvider.ensureFCMToken(); // Add this line
       await userProvider.forceSyncCurrentUser();
       await userProvider.loadCurrentUser();
 
@@ -270,6 +274,7 @@ class _MainScreenState extends State<MainScreen> {
       await userProvider.loadProfileVisitors();
       await userProvider.loadLikesHistory();
       await userProvider.loadVisitsHistory();
+
       // Start streams
       userProvider.startMatchesStream();
       userProvider.startVisitorsAndLikesStreams();
@@ -300,7 +305,6 @@ class _MainScreenState extends State<MainScreen> {
         await authProvider.refreshFCMTokenIfNeeded();
       },
     ));
-
   }
 
 
