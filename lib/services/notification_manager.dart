@@ -304,17 +304,18 @@ class NotificationManager {
   }
 
   // Send match notification with improved handling
+// Replace the sendMatchNotification method in lib/services/notification_manager.dart
   Future<void> sendMatchNotification(String recipientId, String senderName) async {
     try {
-      print('Preparing match notification for $recipientId from $senderName');
+      print('🎉 Preparing match notification for $recipientId from $senderName');
 
-      // Use the new method to get the FCM token
+      // Get the FCM token for the recipient
       String? fcmToken = await _getFcmTokenForUser(recipientId);
 
       if (fcmToken == null || fcmToken.isEmpty) {
-        print('Cannot send match notification: FCM token not found for $recipientId');
+        print('❌ Cannot send match notification: FCM token not found for $recipientId');
 
-        // Create notification without token
+        // Create notification without token - will be processed later
         await _createNotificationDocumentWithoutToken(
           type: 'match',
           title: '🎉 New Match!',
@@ -326,30 +327,49 @@ class NotificationManager {
             'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
           },
         );
-
         return;
       }
 
-      // Original notification creation with token
-      await _createNotificationDocument(
-        type: 'match',
-        title: '🎉 New Match!',
-        body: 'You and $senderName liked each other!',
-        recipientId: recipientId,
-        fcmToken: fcmToken,
-        data: {
+      // Create a unique ID to prevent duplicates
+      final notificationId = 'match_${DateTime.now().millisecondsSinceEpoch}_${recipientId}';
+
+      // Create a high-priority notification document
+      await _firestore.collection('notifications').doc(notificationId).set({
+        'type': 'match',
+        'title': '🎉 New Match!',
+        'body': 'You and $senderName liked each other!',
+        'recipientId': recipientId,
+        'fcmToken': fcmToken,
+        'data': {
           'type': 'match',
           'senderId': FirebaseAuth.instance.currentUser?.uid,
           'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
         },
-      );
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'platform': 'ios',
+        'priority': 'high',
+        'urgent': true, // Special flag for high-priority notifications
+      });
 
-      print('Match notification prepared for $recipientId');
+      print('✅ Match notification created with ID: $notificationId');
+
+      // Wait briefly and check status
+      await Future.delayed(Duration(seconds: 2));
+
+      DocumentSnapshot notificationDoc = await _firestore.collection('notifications').doc(notificationId).get();
+      if (notificationDoc.exists) {
+        Map<String, dynamic>? data = notificationDoc.data() as Map<String, dynamic>?;
+        print('📊 Notification status after 2s: ${data?['status']}');
+
+        if (data?['status'] == 'error') {
+          print('❌ Error in notification: ${data?['error']}');
+        }
+      }
     } catch (e) {
-      print('Error preparing match notification: $e');
+      print('❌ Error sending match notification: $e');
     }
   }
-
   // Add this function to your notification_manager.dart
 
   Future<void> sendTestNotification() async {

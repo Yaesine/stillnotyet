@@ -718,6 +718,10 @@ class FirestoreService {
   }
 
   // Updated to preserve like history
+// Updated recordSwipe method for FirestoreService class
+// Update the recordSwipe method in lib/services/firestore_service.dart
+
+// Add this to the FirestoreService class
   Future<bool> recordSwipe(String swipedUserId, bool isLike, {bool isSuperLike = false}) async {
     try {
       if (currentUserId == null) return false;
@@ -794,6 +798,15 @@ class FirestoreService {
         }
 
         print('Match created between $currentUserId and $swipedUserId');
+
+        // Get sender name for notification
+        DocumentSnapshot senderDoc = await _firestore.collection('users').doc(currentUserId).get();
+        Map<String, dynamic>? senderData = senderDoc.data() as Map<String, dynamic>?;
+        String senderName = senderData?['name'] ?? 'Someone';
+
+        // Create direct match notification
+        await _createDirectMatchNotification(swipedUserId, senderName);
+
         return true; // Match created
       }
 
@@ -805,7 +818,52 @@ class FirestoreService {
     }
   }
 
-  // New method - Get all historical likes
+// New helper method for creating match notifications directly
+  Future<void> _createDirectMatchNotification(String recipientId, String senderName) async {
+    try {
+      print('Creating direct match notification for $recipientId from $senderName');
+
+      // Get recipient user document to check for FCM token
+      DocumentSnapshot recipientDoc = await _firestore.collection('users').doc(recipientId).get();
+      if (!recipientDoc.exists) {
+        print('Recipient user not found: $recipientId');
+        return;
+      }
+
+      Map<String, dynamic> recipientData = recipientDoc.data() as Map<String, dynamic>;
+      String? fcmToken = recipientData['fcmToken'];
+
+      if (fcmToken == null || fcmToken.isEmpty) {
+        print('No FCM token found for recipient: $recipientId');
+        return;
+      }
+
+      // Create notification document
+      String notificationId = 'match_${DateTime.now().millisecondsSinceEpoch}_$recipientId';
+      await _firestore.collection('notifications').doc(notificationId).set({
+        'type': 'match',
+        'title': '🎉 New Match!',
+        'body': 'You and $senderName liked each other!',
+        'recipientId': recipientId,
+        'fcmToken': fcmToken,
+        'data': {
+          'type': 'match',
+          'senderId': currentUserId,
+          'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'platform': 'ios',
+        'priority': 'high',
+        'directCreation': true, // Flag to identify direct creation
+      });
+
+      print('Direct match notification created: $notificationId');
+    } catch (e) {
+      print('Error creating direct match notification: $e');
+    }
+  }
+
   Future<List<Map<String, dynamic>>> getLikesHistory() async {
     try {
       if (currentUserId == null) {

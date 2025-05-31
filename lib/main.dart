@@ -1,6 +1,7 @@
 // lib/main.dart - Updated with Explore tab
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:new_tinder_clone/providers/theme_provider.dart';
@@ -686,10 +687,25 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
+      floatingActionButton: Visibility(
+        visible: !kReleaseMode, // Only show in debug mode
+        child: FloatingActionButton(
+          onPressed: () async {
+            await FCMTokenFixer.debugNotificationPermissions();
+            ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Notification debug complete. Check console logs.'))
+            );
+          },
+          backgroundColor: Colors.red,
+          child: Icon(Icons.notifications_active),
+        ),
+      ),
     );
   }
 
-}
+  }
+
+
 // Add this helper class at the bottom of your main.dart file
 class _LifecycleObserver extends WidgetsBindingObserver {
   final VoidCallback? onResume;

@@ -6,6 +6,432 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onCall} = require("firebase-functions/v2/https");
 
 admin.initializeApp();
+// Add this function to your functions/index.js file
+// Add this to your functions/index.js file
+exports.processAllPendingNotifications = onCall(async (request) => {
+  try {
+    console.log("Processing all pending notifications...");
+
+    // Get all pending notifications
+    const pendingSnapshot = await admin.firestore()
+      .collection("notifications")
+      .where("status", "==", "pending")
+      .get();
+
+    console.log(`Found ${pendingSnapshot.docs.length} pending notifications`);
+
+    const results = {
+      total: pendingSnapshot.docs.length,
+      processed: 0,
+      successful: 0,
+      failed: 0,
+      errors: []
+    };
+
+    // Process each notification
+    for (const notificationDoc of pendingSnapshot.docs) {
+      try {
+        results.processed++;
+        const notification = notificationDoc.data();
+
+        console.log(`Processing notification ${notificationDoc.id}:`, notification.type);
+
+        if (!notification.fcmToken) {
+          console.log(`No FCM token for notification ${notificationDoc.id}`);
+          await notificationDoc.ref.update({
+            status: "error",
+            error: "No FCM token available",
+            processedAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          results.failed++;
+          results.errors.push(`No FCM token for ${notificationDoc.id}`);
+          continue;
+        }
+
+        // Prepare FCM message
+        const message = {
+          token: notification.fcmToken,
+          notification: {
+            title: notification.title,
+            body: notification.body,
+          },
+          data: notification.data || {},
+          // iOS specific configuration
+          apns: {
+            payload: {
+              aps: {
+                "alert": {
+                  title: notification.title,
+                  body: notification.body,
+                },
+                "sound": "default",
+                "badge": 1,
+                "content-available": 1,
+                "mutable-content": 1,
+                "thread-id": notification.data.type || "default",
+                "category": notification.data.type || "DEFAULT",
+              },
+              ...notification.data,
+            },
+            headers: {
+              "apns-priority": "10",
+              "apns-push-type": "alert",
+            },
+          },
+          // Android specific configuration
+          android: {
+            priority: "high",
+            notification: {
+              sound: "default",
+              channelId: "chat_notifications",
+              priority: "high",
+              defaultSound: true,
+              visibility: "public",
+              clickAction: "FLUTTER_NOTIFICATION_CLICK",
+            },
+          },
+        };
+
+        // Send the notification
+        const response = await admin.messaging().send(message);
+        console.log(`Successfully sent notification ${notificationDoc.id}:`, response);
+
+        // Update status to sent
+        await notificationDoc.ref.update({
+          status: "sent",
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+          messageId: response,
+        });
+
+        results.successful++;
+      } catch (error) {
+        console.error(`Error processing notification ${notificationDoc.id}:`, error);
+
+        // Update status to error
+        await notificationDoc.ref.update({
+          status: "error",
+          error: error.message,
+          errorCode: error.code || "unknown",
+          errorTime: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        results.failed++;
+        results.errors.push(`${notificationDoc.id}: ${error.message}`);
+
+        // Handle invalid tokens
+        if (error.code === "messaging/invalid-registration-token" ||
+            error.code === "messaging/registration-token-not-registered") {
+          try {
+            if (notification.recipientId) {
+              await admin.firestore().collection("users").doc(notification.recipientId).update({
+                fcmTokenValid: false,
+                fcmTokenError: error.code,
+                fcmTokenErrorTime: admin.firestore.FieldValue.serverTimestamp(),
+              });
+              console.log(`Marked invalid token for user ${notification.recipientId}`);
+            }
+          } catch (userUpdateError) {
+            console.error("Error marking invalid token:", userUpdateError);
+          }
+        }
+      }
+    }
+
+    console.log("Processing complete:", results);
+    return results;
+  } catch (error) {
+    console.error("Error in processAllPendingNotifications:", error);
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});
+
+// Fix the notifications processing
+exports.fixMatchNotifications = onSchedule("every 1 minutes", async (context) => {
+  try {
+    console.log("Running match notification fixer...");
+
+    // Find any pending match notifications
+    const pendingMatchNotifications = await admin.firestore()
+      .collection("notifications")
+      .where("type", "==", "match")
+      .where("status", "==", "pending")
+      .get();
+
+    console.log(`Found ${pendingMatchNotifications.docs.length} pending match notifications`);
+
+    for (const notifDoc of pendingMatchNotifications.docs) {
+      try {
+        const notification = notifDoc.data();
+        const fcmToken = notification.fcmToken;
+
+        if (!fcmToken) {
+          console.log(`Notification ${notifDoc.id} has no FCM token, skipping`);
+          continue;
+        }
+
+        // Create a message with proper formatting for iOS
+        const message = {
+          token: fcmToken,
+          notification: {
+            title: notification.title || "🎉 New Match!",
+            body: notification.body || "You have a new match!",
+          },
+          data: notification.data || {},
+          // iOS specific configuration - CRITICAL FOR iOS NOTIFICATIONS
+          apns: {
+            payload: {
+              aps: {
+                "alert": {
+                  title: notification.title || "🎉 New Match!",
+                  body: notification.body || "You have a new match!",
+                },
+                "sound": "default",
+                "badge": 1,
+                "content-available": 1,
+                "mutable-content": 1,
+                "thread-id": "match",
+                "category": "MATCH",
+              },
+              // Include the data payload for iOS
+              ...notification.data,
+            },
+            headers: {
+              "apns-priority": "10", // High priority
+              "apns-push-type": "alert",
+            },
+          },
+          // Android specific configuration
+          android: {
+            priority: "high",
+            notification: {
+              sound: "default",
+              channelId: "chat_notifications",
+              priority: "high",
+              defaultSound: true,
+              visibility: "public",
+              clickAction: "FLUTTER_NOTIFICATION_CLICK",
+            },
+          },
+        };
+
+        console.log(`Sending match notification with message:`, JSON.stringify(message, null, 2));
+
+        // Send the notification
+        const response = await admin.messaging().send(message);
+        console.log(`Successfully sent match notification: ${response}`);
+
+        // Update notification status
+        await notifDoc.ref.update({
+          status: "sent",
+          sentAt: admin.firestore.FieldValue.serverTimestamp(),
+          messageId: response,
+        });
+      } catch (error) {
+        console.error(`Error processing notification ${notifDoc.id}:`, error);
+
+        // Update with error status
+        await notifDoc.ref.update({
+          status: "error",
+          error: error.message,
+          errorCode: error.code || "unknown",
+          errorTime: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+
+    console.log("Match notification fixer completed");
+    return null;
+  } catch (error) {
+    console.error("Error in match notification fixer:", error);
+    return null;
+  }
+});
+// Add this to your functions/index.js file
+exports.fixNotificationSystem = onCall(async (request) => {
+  try {
+    // Get user ID from request
+    const userId = request.data.userId || (request.auth ? request.auth.uid : null);
+    if (!userId) {
+      throw new Error("No user ID provided");
+    }
+
+    console.log(`Running notification system fix for user ${userId}`);
+
+    // Get the user document
+    const userDoc = await admin.firestore().collection("users").doc(userId).get();
+    if (!userDoc.exists) {
+      throw new Error("User not found");
+    }
+
+    const userData = userDoc.data();
+    const fcmToken = userData.fcmToken;
+
+    // Send a test notification
+    if (fcmToken) {
+      const message = {
+        token: fcmToken,
+        notification: {
+          title: "🛠️ Notification System Test",
+          body: "Your notification system is now working correctly!",
+        },
+        data: {
+          type: "system_test",
+          timestamp: Date.now().toString(),
+        },
+        apns: {
+          payload: {
+            aps: {
+              "alert": {
+                title: "🛠️ Notification System Test",
+                body: "Your notification system is now working correctly!",
+              },
+              "sound": "default",
+              "badge": 1,
+              "content-available": 1,
+            },
+          },
+          headers: {
+            "apns-priority": "10",
+            "apns-push-type": "alert",
+          },
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channelId: "chat_notifications",
+          },
+        },
+      };
+
+      try {
+        const response = await admin.messaging().send(message);
+        console.log("Test notification sent successfully:", response);
+        return {
+          success: true,
+          messageId: response,
+          token: fcmToken.substring(0, 10) + "...",
+        };
+      } catch (error) {
+        console.error("Error sending test notification:", error);
+        return {
+          success: false,
+          error: error.message,
+          code: error.code,
+          tokenStatus: "invalid",
+        };
+      }
+    } else {
+      return {
+        success: false,
+        error: "No FCM token available",
+        tokenStatus: "missing",
+      };
+    }
+  } catch (error) {
+    console.error("Error fixing notification system:", error);
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});
+
+
+// Create a new function in functions/index.js to handle match notifications explicitly
+exports.sendMatchNotification = onCall(async (request) => {
+  try {
+    const { recipientId, senderName } = request.data;
+    if (!recipientId || !senderName) {
+      throw new Error("Missing required parameters");
+    }
+
+    // Get recipient's FCM token
+    const userDoc = await admin.firestore().collection("users").doc(recipientId).get();
+    if (!userDoc.exists) {
+      throw new Error("Recipient not found");
+    }
+
+    const userData = userDoc.data();
+    const fcmToken = userData.fcmToken;
+
+    if (!fcmToken) {
+      throw new Error("Recipient has no FCM token");
+    }
+
+    // Create notification in Firestore for tracking
+    const notificationId = `match_${Date.now()}_${recipientId}`;
+    await admin.firestore().collection("notifications").doc(notificationId).set({
+      type: "match",
+      title: "🎉 New Match!",
+      body: `You and ${senderName} liked each other!`,
+      recipientId: recipientId,
+      fcmToken: fcmToken,
+      data: {
+        type: "match",
+        senderId: request.auth ? request.auth.uid : null,
+        timestamp: Date.now().toString(),
+      },
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      status: "pending",
+      platform: "ios",
+      priority: "high",
+    });
+
+    // Send the notification directly
+    const message = {
+      token: fcmToken,
+      notification: {
+        title: "🎉 New Match!",
+        body: `You and ${senderName} liked each other!`,
+      },
+      data: {
+        type: "match",
+        senderId: request.auth ? request.auth.uid : null,
+        timestamp: Date.now().toString(),
+      },
+      apns: {
+        payload: {
+          aps: {
+            "alert": {
+              title: "🎉 New Match!",
+              body: `You and ${senderName} liked each other!`,
+            },
+            "sound": "default",
+            "badge": 1,
+            "content-available": 1,
+            "mutable-content": 1,
+            "thread-id": "match",
+            "category": "match",
+          },
+        },
+        headers: {
+          "apns-priority": "10",
+          "apns-push-type": "alert",
+        },
+      },
+      android: {
+        priority: "high",
+        notification: {
+          sound: "default",
+          channelId: "chat_notifications",
+          priority: "high",
+        },
+      },
+    };
+
+    const response = await admin.messaging().send(message);
+
+    // Update notification status
+    await admin.firestore().collection("notifications").doc(notificationId).update({
+      status: "sent",
+      sentAt: admin.firestore.FieldValue.serverTimestamp(),
+      messageId: response,
+    });
+
+    return { success: true, messageId: response };
+  } catch (error) {
+    console.error("Error sending match notification:", error);
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});
 
 exports.sendNotification = onDocumentCreated("notifications/{notificationId}", async (event) => {
   const snapshot = event.data;
@@ -222,7 +648,7 @@ exports.onNewMessage = onDocumentCreated("messages/{messageId}", async (event) =
     await admin.firestore().collection("notifications").doc(notificationId).set({
       type: "message",
       title: "Marifactor",
-      body: `${senderName} sent you a message`,
+      body: `${senderName} sent you a new message`,
       recipientId: message.receiverId,
       fcmToken: fcmToken,
       data: {
