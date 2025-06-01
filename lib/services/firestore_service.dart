@@ -393,12 +393,15 @@ class FirestoreService {
         swipedUserIds.add(swipedId);
       }
 
-      // Filter out already swiped users
+      // Get blocked users
+      List<String> blockedUserIds = await getBlockedUserIds();
+
+      // Filter out already swiped users AND blocked users in one go
       filteredUsers = filteredUsers
-          .where((user) => !swipedUserIds.contains(user.id))
+          .where((user) => !swipedUserIds.contains(user.id) && !blockedUserIds.contains(user.id))
           .toList();
 
-      print('FINAL RESULT: ${filteredUsers.length} potential matches after removing swiped users');
+      print('FINAL RESULT: ${filteredUsers.length} potential matches after removing swiped and blocked users');
 
       return filteredUsers;
     } catch (e) {
@@ -827,6 +830,43 @@ class FirestoreService {
     } catch (e) {
       print('Error recording swipe: $e');
       return false;
+    }
+  }
+
+  // Check if a user is blocked
+  Future<bool> isUserBlocked(String userId) async {
+    try {
+      if (currentUserId == null) return false;
+
+      final blockedDoc = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('blocked_users')
+          .doc(userId)
+          .get();
+
+      return blockedDoc.exists;
+    } catch (e) {
+      print('Error checking if user is blocked: $e');
+      return false;
+    }
+  }
+
+// Get list of blocked user IDs
+  Future<List<String>> getBlockedUserIds() async {
+    try {
+      if (currentUserId == null) return [];
+
+      final blockedSnapshot = await _firestore
+          .collection('users')
+          .doc(currentUserId)
+          .collection('blocked_users')
+          .get();
+
+      return blockedSnapshot.docs.map((doc) => doc.id).toList();
+    } catch (e) {
+      print('Error getting blocked users: $e');
+      return [];
     }
   }
   // Add this new method to lib/services/firestore_service.dart

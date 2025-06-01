@@ -565,36 +565,117 @@ class _UserProfileDetailState extends State<UserProfileDetail>
   }
 
   void _showReportDialog(BuildContext context) {
-    // Implementation for report dialog
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDarkMode ? AppColors.darkCard : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 20,
+          bottom: MediaQuery.of(context).padding.bottom + 20,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Handle bar
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDarkMode ? AppColors.darkDivider : Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Title
             Text(
               'Report ${widget.user.name}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+              ),
             ),
-            const SizedBox(height: 20),
-            const Text('Please select a reason for reporting this profile:'),
-            const SizedBox(height: 20),
-            ListTile(
-              title: const Text('Inappropriate photos'),
-              onTap: () => Navigator.pop(context),
+            const SizedBox(height: 8),
+            Text(
+              'Help us understand what\'s happening',
+              style: TextStyle(
+                fontSize: 14,
+                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+              ),
             ),
-            ListTile(
-              title: const Text('Fake profile / Scam'),
-              onTap: () => Navigator.pop(context),
+            const SizedBox(height: 24),
+
+            // Report options
+            _buildReportOption(
+              context: context,
+              icon: Icons.photo_camera,
+              title: 'Inappropriate photos',
+              description: 'Profile contains nudity or sexual content',
+              reason: 'inappropriate_photos',
             ),
-            ListTile(
-              title: const Text('Offensive behavior'),
-              onTap: () => Navigator.pop(context),
+            _buildReportOption(
+              context: context,
+              icon: Icons.person_off,
+              title: 'Fake profile',
+              description: 'This person is pretending to be someone else',
+              reason: 'fake_profile',
+            ),
+            _buildReportOption(
+              context: context,
+              icon: Icons.warning,
+              title: 'Scam or spam',
+              description: 'Asking for money or promoting services',
+              reason: 'scam',
+            ),
+            _buildReportOption(
+              context: context,
+              icon: Icons.message,
+              title: 'Offensive messages',
+              description: 'Sent inappropriate or harassing messages',
+              reason: 'offensive_messages',
+            ),
+            _buildReportOption(
+              context: context,
+              icon: Icons.child_care,
+              title: 'Under 18',
+              description: 'This person appears to be underage',
+              reason: 'underage',
+            ),
+            _buildReportOption(
+              context: context,
+              icon: Icons.more_horiz,
+              title: 'Other',
+              description: 'Something else is wrong with this profile',
+              reason: 'other',
+            ),
+
+            const SizedBox(height: 16),
+
+            // Cancel button
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Center(
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(
+                    color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -602,6 +683,379 @@ class _UserProfileDetailState extends State<UserProfileDetail>
     );
   }
 
+  Widget _buildReportOption({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String description,
+    required String reason,
+  }) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => _handleReport(context, reason),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleReport(BuildContext context, String reason) {
+    // Close the bottom sheet
+    Navigator.pop(context);
+
+    // Show confirmation dialog
+    _showReportConfirmationDialog(context, reason);
+  }
+
+  void _showReportConfirmationDialog(BuildContext context, String reason) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDarkMode ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.flag, color: Colors.red, size: 28),
+            const SizedBox(width: 12),
+            Text(
+              'Report User',
+              style: TextStyle(
+                color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Are you sure you want to report ${widget.user.name}?',
+              style: TextStyle(
+                color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'This action will be reviewed by our team',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (reason == 'other') ...[
+              const SizedBox(height: 16),
+              TextField(
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Please provide more details...',
+                  hintStyle: TextStyle(
+                    color: isDarkMode ? AppColors.darkTextTertiary : AppColors.textTertiary,
+                  ),
+                  filled: true,
+                  fillColor: isDarkMode ? AppColors.darkElevated : Colors.grey.shade100,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (value) {
+                  // Store the additional details
+                  _additionalDetails = value;
+                },
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _submitReport(context, reason);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Report'),
+          ),
+        ],
+      ),
+    );
+  }
+
+// Add this property at the class level
+  String _additionalDetails = '';
+
+  Future<void> _submitReport(BuildContext context, String reason) async {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    // Show loading indicator
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDarkMode ? AppColors.darkCard : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Submitting report...',
+                style: TextStyle(
+                  color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final currentUserId = auth.FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId == null) throw Exception('User not authenticated');
+
+      // Create report document
+      await FirebaseFirestore.instance.collection('reports').add({
+        'reporterId': currentUserId,
+        'reportedUserId': widget.user.id,
+        'reportedUserName': widget.user.name,
+        'reason': reason,
+        'additionalDetails': reason == 'other' ? _additionalDetails : null,
+        'status': 'pending',
+        'createdAt': FieldValue.serverTimestamp(),
+        'reviewedAt': null,
+        'reviewedBy': null,
+        'action': null,
+        'platform': 'ios',
+      });
+
+      // Optionally block the user locally
+      await _blockUserLocally(context);
+
+      // Close loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // Show success dialog
+      if (context.mounted) {
+        _showReportSuccessDialog(context);
+      }
+
+    } catch (e) {
+      print('Error submitting report: $e');
+
+      // Close loading dialog
+      if (context.mounted) {
+        Navigator.pop(context);
+      }
+
+      // Show error
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to submit report. Please try again.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _blockUserLocally(BuildContext context) async {
+    try {
+      final currentUserId = auth.FirebaseAuth.instance.currentUser?.uid;
+      if (currentUserId == null) return;
+
+      // Add to blocked users collection
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUserId)
+          .collection('blocked_users')
+          .doc(widget.user.id)
+          .set({
+        'blockedAt': FieldValue.serverTimestamp(),
+        'userId': widget.user.id,
+        'userName': widget.user.name,
+      });
+
+      // Remove from potential matches in the provider
+      if (context.mounted) {
+        Provider.of<UserProvider>(context, listen: false).removeProfileLocally(widget.user.id);
+      }
+
+    } catch (e) {
+      print('Error blocking user locally: $e');
+    }
+  }
+
+  void _showReportSuccessDialog(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: isDarkMode ? AppColors.darkCard : Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle,
+                color: Colors.green,
+                size: 40,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Report Submitted',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Thank you for helping keep our community safe. Our team will review this report.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This user has been blocked from your account.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDarkMode ? AppColors.darkTextTertiary : AppColors.textTertiary,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              // Pop the profile screen as well
+              Navigator.pop(context);
+            },
+            child: Text(
+              'Done',
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   // Include your section building methods like _buildProfessionalSection(), etc.
   Widget _buildSection({
     required String title,
