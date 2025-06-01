@@ -722,6 +722,8 @@ class FirestoreService {
 // Update the recordSwipe method in lib/services/firestore_service.dart
 
 // Add this to the FirestoreService class
+// Update the recordSwipe method in lib/services/firestore_service.dart
+
   Future<bool> recordSwipe(String swipedUserId, bool isLike, {bool isSuperLike = false}) async {
     try {
       if (currentUserId == null) return false;
@@ -740,7 +742,7 @@ class FirestoreService {
 
       print('${isLike ? (isSuperLike ? "SuperLike" : "Like") : "Dislike"} recorded from $currentUserId to $swipedUserId');
 
-      // If it was a dislike, we don't need to check for a match
+      // If it was a dislike, we don't need to check for a match or send notification
       if (!isLike) return false;
 
       // Save to likes history if it's a like (even if it becomes a match later)
@@ -753,15 +755,20 @@ class FirestoreService {
         'becameMatch': false, // Will update this if it becomes a match
       });
 
-      // Check if swiped user also liked current user or if this is a super like
+      // Get sender (current user) details for notification
+      DocumentSnapshot senderDoc = await _firestore.collection('users').doc(currentUserId).get();
+      Map<String, dynamic>? senderData = senderDoc.data() as Map<String, dynamic>?;
+      String senderName = senderData?['name'] ?? 'Someone';
+
+      // Check if swiped user also liked current user
       QuerySnapshot mutualLikeCheck = await _swipesCollection
           .where('swiperId', isEqualTo: swipedUserId)
           .where('swipedId', isEqualTo: currentUserId)
           .where('liked', isEqualTo: true)
           .get();
 
-      // If mutual like or super like, create a match
-      if (mutualLikeCheck.docs.isNotEmpty || isSuperLike) {
+      // If mutual like, create a match
+      if (mutualLikeCheck.docs.isNotEmpty) {
         String matchId = '$currentUserId-$swipedUserId';
 
         // Create match document with super like info
@@ -799,25 +806,29 @@ class FirestoreService {
 
         print('Match created between $currentUserId and $swipedUserId');
 
-        // Get sender name for notification
-        DocumentSnapshot senderDoc = await _firestore.collection('users').doc(currentUserId).get();
-        Map<String, dynamic>? senderData = senderDoc.data() as Map<String, dynamic>?;
-        String senderName = senderData?['name'] ?? 'Someone';
-
-        // Create direct match notification
+        // Send MATCH notification
         await _createDirectMatchNotification(swipedUserId, senderName);
 
         return true; // Match created
-      }
+      } else {
+        // NO MATCH YET - Send "Someone liked you" notification
+        print('No match yet, sending like notification to $swipedUserId');
 
-      print('No match yet between $currentUserId and $swipedUserId');
-      return false; // No match yet
+        if (isSuperLike) {
+          // Send super like notification
+          await _notificationManager.sendSuperLikeNotification(swipedUserId, senderName);
+        } else {
+          // Send regular like notification
+          await _notificationManager.sendLikeNotification(swipedUserId, senderName);
+        }
+
+        return false; // No match yet
+      }
     } catch (e) {
       print('Error recording swipe: $e');
       return false;
     }
   }
-
   // Add this new method to lib/services/firestore_service.dart
 
   Future<void> createNewUserWithToken(String userId, String name, String email, String? fcmToken) async {

@@ -138,6 +138,8 @@ class NotificationManager {
     }
   }
   // Navigate based on notification type with better routing
+// Update the existing _navigateBasedOnType method in lib/services/notification_manager.dart
+
   void _navigateBasedOnType(String? type, String? id) {
     if (type == null) {
       print('Cannot navigate: Notification type is null');
@@ -168,6 +170,7 @@ class NotificationManager {
           }
           break;
 
+        case 'like':          // ADD THIS CASE
         case 'super_like':
         case 'profile_view':
           navigatorKey.currentState?.pushNamedAndRemoveUntil(
@@ -382,6 +385,71 @@ class NotificationManager {
       print('Notification document created for $recipientId: $type');
     } catch (e) {
       print('Error creating notification document: $e');
+    }
+  }
+
+  // Add this method to lib/services/notification_manager.dart
+
+// Send like notification (non-super like)
+  Future<void> sendLikeNotification(String recipientId, String senderName) async {
+    try {
+      print('💕 Preparing like notification for $recipientId from $senderName');
+
+      // Get the FCM token for the recipient
+      String? fcmToken = await _getFcmTokenForUser(recipientId);
+
+      // Create a unique ID to prevent duplicates
+      final notificationId = 'like_${DateTime.now().millisecondsSinceEpoch}_${recipientId}';
+
+      // Get recipient platform
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(recipientId).get();
+      Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
+      String platform = userData?['platform'] ?? 'ios';
+
+      if (fcmToken == null || fcmToken.isEmpty) {
+        print('❌ Cannot send like notification: FCM token not found for $recipientId');
+
+        // Create notification without token - will be processed later
+        await _firestore.collection('notifications').doc(notificationId).set({
+          'type': 'like',
+          'title': 'Marifecto',
+          'body': 'Somebody likes you.😍Open Marifecto to see who!',
+          'recipientId': recipientId,
+          'data': {
+            'type': 'like',
+            'senderId': FirebaseAuth.instance.currentUser?.uid,
+            'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          },
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'pending_token',
+          'platform': platform,
+          'priority': 'high',
+          'error': 'No FCM token available',
+        });
+        return;
+      }
+
+      // Create notification document WITH token
+      await _firestore.collection('notifications').doc(notificationId).set({
+        'type': 'like',
+        'title': 'Marifecto',
+        'body': 'Somebody likes you.😍Open Marifecto to see who!',
+        'recipientId': recipientId,
+        'fcmToken': fcmToken,
+        'data': {
+          'type': 'like',
+          'senderId': FirebaseAuth.instance.currentUser?.uid,
+          'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'platform': platform,
+        'priority': 'high',
+      });
+
+      print('✅ Like notification created with ID: $notificationId');
+    } catch (e) {
+      print('❌ Error sending like notification: $e');
     }
   }
 

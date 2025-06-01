@@ -474,6 +474,7 @@ class _MainScreenState extends State<MainScreen> {
           }
           break;
 
+        case 'like':        // NEW: Handle like notifications
         case 'super_like':
         case 'profile_view':
           setState(() {
