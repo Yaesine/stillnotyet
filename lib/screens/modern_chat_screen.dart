@@ -245,37 +245,6 @@ class _ModernChatScreenState extends State<ModernChatScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         // ADD THIS: Actions with the test button
-        actions: [
-          // Test notification button - remove this after testing
-          IconButton(
-            icon: const Icon(Icons.science, color: Colors.orange),
-            onPressed: () {
-              // Show the test button in a dialog
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Notification Test'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Test notifications with current chat partner'),
-                      const SizedBox(height: 16),
-                      TestNotificationButton(recipientId: _matchedUser?.id),
-                      const SizedBox(height: 16),
-                      FixTokenButton(), // ADD THIS LINE
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Close'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

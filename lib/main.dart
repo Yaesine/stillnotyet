@@ -236,11 +236,12 @@ class MainScreen extends StatefulWidget {
   _MainScreenState createState() => _MainScreenState();
 }
 
+// Updated MainScreen class from lib/main.dart
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   final List<Widget> _screens = [
     const EnhancedHomeScreen(),
-    const ExploreScreen(),  // Add the new ExploreScreen here
+    const ExploreScreen(),
     const LikesScreen(),
     const MatchesScreen(),
     const StyleProfileScreen(),
@@ -248,7 +249,6 @@ class _MainScreenState extends State<MainScreen> {
 
   final PageController _pageController = PageController();
 
-  // In your MainScreen class
   @override
   void initState() {
     super.initState();
@@ -307,12 +307,6 @@ class _MainScreenState extends State<MainScreen> {
     ));
   }
 
-
-
-// Replace the _initializeNotificationHandler method in your _MainScreenState class
-
-// Update the _initializeNotificationHandler method in MainScreen to prevent duplicate listeners
-
   void _initializeNotificationHandler() {
     try {
       print('Initializing notification handler in MainScreen');
@@ -361,8 +355,7 @@ class _MainScreenState extends State<MainScreen> {
       print('Error initializing notification handler: $e');
     }
   }
-  
-// Add these new methods to your _MainScreenState class
+
   Future<void> _getAndSaveToken() async {
     try {
       print('Getting FCM token...');
@@ -545,7 +538,6 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-
   void _handleNotificationAction(RemoteMessage message) {
     final type = message.data['type'];
 
@@ -609,7 +601,6 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-
   @override
   void dispose() {
     _pageController.dispose();
@@ -637,10 +628,10 @@ class _MainScreenState extends State<MainScreen> {
           boxShadow: [
             BoxShadow(
               color: isDarkMode
-                  ? Colors.black.withOpacity(0.2)
-                  : Colors.black.withOpacity(0.1),
-              blurRadius: isDarkMode ? 8 : 10,
-              offset: const Offset(0, -2),
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.black.withOpacity(0.08),
+              blurRadius: isDarkMode ? 12 : 20,
+              offset: const Offset(0, -3),
             ),
           ],
         ),
@@ -658,58 +649,187 @@ class _MainScreenState extends State<MainScreen> {
           },
           selectedItemColor: AppColors.primary,
           unselectedItemColor: isDarkMode
-              ? AppColors.darkTextSecondary
-              : Colors.grey,
-          showSelectedLabels: true,
-          showUnselectedLabels: true,
+              ? AppColors.darkTextSecondary.withOpacity(0.7)
+              : Colors.grey.withOpacity(0.8),
+          showSelectedLabels: false,  // Hide labels
+          showUnselectedLabels: false, // Hide labels
           type: BottomNavigationBarType.fixed,
-          elevation: 8,
+          elevation: 0,
           backgroundColor: isDarkMode
               ? AppColors.darkSurface
               : Colors.white,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
-          items: const [
+          iconSize: 28, // Increased icon size
+          items: [
+            // Discover tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Icon(Icons.whatshot),
-              label: 'Discover',
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: _currentIndex == 0
+                      ? LinearGradient(
+                    colors: [
+                      AppColors.primary.withOpacity(0.2),
+                      AppColors.secondary.withOpacity(0.2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                      : null,
+                ),
+                child: Icon(
+                  Icons.whatshot_rounded,
+                  size: _currentIndex == 0 ? 32 : 28,
+                ),
+              ),
+              label: '',
             ),
+            // Explore tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Icon(Icons.explore),
-              label: 'Explore',
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: _currentIndex == 1
+                      ? LinearGradient(
+                    colors: [
+                      Colors.purple.withOpacity(0.2),
+                      Colors.deepPurple.withOpacity(0.2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                      : null,
+                ),
+                child: Icon(
+                  Icons.explore_rounded,
+                  size: _currentIndex == 1 ? 32 : 28,
+                ),
+              ),
+              label: '',
             ),
+            // Likes tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Icon(Icons.favorite),
-              label: 'Likes',
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: _currentIndex == 2
+                      ? LinearGradient(
+                    colors: [
+                      Colors.pink.withOpacity(0.2),
+                      Colors.red.withOpacity(0.2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                      : null,
+                ),
+                child: Stack(
+                  children: [
+                    Icon(
+                      Icons.favorite_rounded,
+                      size: _currentIndex == 2 ? 32 : 28,
+                    ),
+                    // Optional: Add a notification badge
+                    if (false) // Replace with actual condition for new likes
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isDarkMode ? AppColors.darkSurface : Colors.white,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              label: '',
             ),
+            // Matches/Chat tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Icon(Icons.chat),
-              label: 'Matches',
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: _currentIndex == 3
+                      ? LinearGradient(
+                    colors: [
+                      Colors.blue.withOpacity(0.2),
+                      Colors.lightBlue.withOpacity(0.2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                      : null,
+                ),
+                child: Stack(
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_rounded,
+                      size: _currentIndex == 3 ? 32 : 28,
+                    ),
+                    // Optional: Add a notification badge for unread messages
+                    if (false) // Replace with actual condition for unread messages
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: Colors.blue,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isDarkMode ? AppColors.darkSurface : Colors.white,
+                              width: 1,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              label: '',
             ),
+            // Profile tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Icon(Icons.person),
-              label: 'Profile',
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: _currentIndex == 4
+                      ? LinearGradient(
+                    colors: [
+                      Colors.orange.withOpacity(0.2),
+                      Colors.amber.withOpacity(0.2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                      : null,
+                ),
+                child: Icon(
+                  Icons.person_rounded,
+                  size: _currentIndex == 4 ? 32 : 28,
+                ),
+              ),
+              label: '',
             ),
           ],
         ),
       ),
-      floatingActionButton: Visibility(
-        visible: !kReleaseMode, // Only show in debug mode
-        child: FloatingActionButton(
-          onPressed: () async {
-            await FCMTokenFixer.debugNotificationPermissions();
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Notification debug complete. Check console logs.'))
-            );
-          },
-          backgroundColor: Colors.red,
-          child: Icon(Icons.notifications_active),
-        ),
-      ),
     );
   }
-
-  }
-
+}
 
 // Add this helper class at the bottom of your main.dart file
 class _LifecycleObserver extends WidgetsBindingObserver {
