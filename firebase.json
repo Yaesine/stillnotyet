@@ -1,4 +1,43 @@
 {
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "marifecto",
+          "appId": "1:395654341992:android:2efd2ee1443bde5a8022dd",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "marifecto",
+          "appId": "1:395654341992:ios:9cf166dfe7ee0df08022dd",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "marifecto",
+          "appId": "1:395654341992:ios:282de64a05d130f28022dd",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "marifecto",
+          "configurations": {
+            "android": "1:395654341992:android:2efd2ee1443bde5a8022dd",
+            "ios": "1:395654341992:ios:9cf166dfe7ee0df08022dd",
+            "macos": "1:395654341992:ios:282de64a05d130f28022dd",
+            "web": "1:395654341992:web:dfc948e294f65f518022dd",
+            "windows": "1:395654341992:web:c0afc25917791ac48022dd"
+          }
+        }
+      }
+    }
+  },
   "functions": [
     {
       "source": "functions",

@@ -1,43 +1,41 @@
 {
   "project_info": {
-    "project_number": "1075080846660",
-    "firebase_url": "https://tinderclones-4f4c4-default-rtdb.firebaseio.com",
-    "project_id": "tinderclones-4f4c4",
-    "storage_bucket": "tinderclones-4f4c4.firebasestorage.app"
+    "project_number": "395654341992",
+    "project_id": "marifecto",
+    "storage_bucket": "marifecto.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1075080846660:android:9906f645ce630bacd70b11",
+        "mobilesdk_app_id": "1:395654341992:android:2efd2ee1443bde5a8022dd",
         "android_client_info": {
           "package_name": "com.example.new_tinder_clone"
         }
       },
       "oauth_client": [
         {
-          "client_id": "1075080846660-q2bseqsgi407q7lo1pa3jomtsssrsf0i.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.new_tinder_clone",
-            "certificate_hash": "5543170fc0b2b3711ee433e0c4b38c710a86ebda"
-          }
-        },
-        {
-          "client_id": "1075080846660-lnm5iq6asid8ov2dohovd0uia1rc1shv.apps.googleusercontent.com",
+          "client_id": "395654341992-jc355kuch0841nq3v0v50op4oqbb54u6.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyCrfltwczbFsQ4vH6MMQkr5LzQIfpAhHpE"
+          "current_key": "AIzaSyD6IzPDIXLGmRFIWa_qtnUVeBBithbkq2A"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "1075080846660-lnm5iq6asid8ov2dohovd0uia1rc1shv.apps.googleusercontent.com",
+              "client_id": "395654341992-jc355kuch0841nq3v0v50op4oqbb54u6.apps.googleusercontent.com",
               "client_type": 3
+            },
+            {
+              "client_id": "395654341992-6pc2h2pmpou2fg59q5lpbv1g1lp6f7gv.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.marifecto.datechatmeet"
+              }
             }
           ]
         }

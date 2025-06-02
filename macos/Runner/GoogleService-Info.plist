@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>395654341992-40e3uqm4f1u340v9j4ptk4d50er18o7t.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.395654341992-40e3uqm4f1u340v9j4ptk4d50er18o7t</string>
+	<key>API_KEY</key>
+	<string>AIzaSyC9uen8hB47r0X0gkyfIXgfMmjvGSSOTwM</string>
+	<key>GCM_SENDER_ID</key>
+	<string>395654341992</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.newTinderClone</string>
+	<key>PROJECT_ID</key>
+	<string>marifecto</string>
+	<key>STORAGE_BUCKET</key>
+	<string>marifecto.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:395654341992:ios:282de64a05d130f28022dd</string>
+</dict>
+</plist>

@@ -13,15 +13,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-              'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-              'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -35,32 +29,51 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR-WEB-API-KEY',
-    appId: 'YOUR-WEB-APP-ID',
-    messagingSenderId: '1075080846660',
-    projectId: 'tinderclones-4f4c4',
-    authDomain: 'tinderclones-4f4c4.firebaseapp.com',
-    storageBucket: 'tinderclones-4f4c4.appspot.com',
-    databaseURL: 'https://tinderclones-4f4c4-default-rtdb.firebaseio.com',
+    apiKey: 'AIzaSyBGdg9dDBOa-THR7iPZEJCbKi8THsBEzH8',
+    appId: '1:395654341992:web:dfc948e294f65f518022dd',
+    messagingSenderId: '395654341992',
+    projectId: 'marifecto',
+    authDomain: 'marifecto.firebaseapp.com',
+    storageBucket: 'marifecto.firebasestorage.app',
+    measurementId: 'G-38FX86PFGK',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyAOk-PEqieOaJ5O7RXEI8_lfBMQw5KJksI',
-    appId: '1075080846660-q2bseqsgi407q7lo1pa3jomtsssrsf0i.apps.googleusercontent.com',
-    messagingSenderId: '1075080846660',
-    projectId: 'tinderclones-4f4c4',
-    storageBucket: 'tinderclones-4f4c4.appspot.com',
-    databaseURL: 'https://tinderclones-4f4c4-default-rtdb.firebaseio.com',
+    apiKey: 'AIzaSyD6IzPDIXLGmRFIWa_qtnUVeBBithbkq2A',
+    appId: '1:395654341992:android:2efd2ee1443bde5a8022dd',
+    messagingSenderId: '395654341992',
+    projectId: 'marifecto',
+    storageBucket: 'marifecto.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAOk-PEqieOaJ5O7RXEI8_lfBMQw5KJksI',
-    appId: '1:1075080846660:ios:613de45ee4399153d70b11',
-    messagingSenderId: '1075080846660',
-    projectId: 'tinderclones-4f4c4',
-    storageBucket: 'tinderclones-4f4c4.appspot.com',
-    databaseURL: 'https://tinderclones-4f4c4-default-rtdb.firebaseio.com',
-    iosClientId: '1075080846660-fehqn2upmf9ktd5v2or4g987ecqu3rej.apps.googleusercontent.com',
-    iosBundleId: 'com.ycheqrouni.newtinderclone',
+    apiKey: 'AIzaSyC9uen8hB47r0X0gkyfIXgfMmjvGSSOTwM',
+    appId: '1:395654341992:ios:9cf166dfe7ee0df08022dd',
+    messagingSenderId: '395654341992',
+    projectId: 'marifecto',
+    storageBucket: 'marifecto.firebasestorage.app',
+    iosClientId: '395654341992-6pc2h2pmpou2fg59q5lpbv1g1lp6f7gv.apps.googleusercontent.com',
+    iosBundleId: 'com.marifecto.datechatmeet',
   );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyC9uen8hB47r0X0gkyfIXgfMmjvGSSOTwM',
+    appId: '1:395654341992:ios:282de64a05d130f28022dd',
+    messagingSenderId: '395654341992',
+    projectId: 'marifecto',
+    storageBucket: 'marifecto.firebasestorage.app',
+    iosClientId: '395654341992-40e3uqm4f1u340v9j4ptk4d50er18o7t.apps.googleusercontent.com',
+    iosBundleId: 'com.example.newTinderClone',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyBGdg9dDBOa-THR7iPZEJCbKi8THsBEzH8',
+    appId: '1:395654341992:web:c0afc25917791ac48022dd',
+    messagingSenderId: '395654341992',
+    projectId: 'marifecto',
+    authDomain: 'marifecto.firebaseapp.com',
+    storageBucket: 'marifecto.firebasestorage.app',
+    measurementId: 'G-S55JRCYMNX',
+  );
+
 }

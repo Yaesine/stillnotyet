@@ -86,6 +86,8 @@ void main() async {
   runApp(MyApp());
 }
 
+
+
 Future<void> _initializeAppInBackground() async {
   try {
     // Initialize Firebase after UI is shown
@@ -827,8 +829,11 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
+
     );
+
   }
+
 }
 
 // Add this helper class at the bottom of your main.dart file
