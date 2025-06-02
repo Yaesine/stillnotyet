@@ -1,4 +1,4 @@
-// lib/screens/filters_screen.dart - Enhanced with all profile features for filtering fi
+// lib/screens/filters_screen.dart - Enhanced with all requested features
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +8,7 @@ import '../services/firestore_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/profile_options.dart';
 import '../widgets/components/modern_selection_widgets.dart';
+import 'premium_screen.dart';
 
 class FiltersScreen extends StatefulWidget {
   const FiltersScreen({Key? key}) : super(key: key);
@@ -24,11 +25,14 @@ class _FiltersScreenState extends State<FiltersScreen> {
   bool _isLoading = false;
 
   // Advanced filters
-  bool _showProfilesWithPhoto = true;
+  bool _showProfilesWithPhoto = false; // Changed to false by default
   bool _showVerifiedOnly = false;
   List<String> _selectedInterests = [];
   bool _advancedMatchingEnabled = false;
   double _activityLevel = 3;
+
+  // NEW: Verified badge option
+  bool _wantVerifiedBadge = false;
 
   // Professional filters
   bool _filterByProfessional = false;
@@ -62,14 +66,15 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
   final FirestoreService _firestoreService = FirestoreService();
 
-  // Track which sections are expanded
+  // Track which sections are expanded - ALL TRUE by default now
   bool _basicFiltersExpanded = true;
-  bool _advancedFiltersExpanded = false;
-  bool _professionalFiltersExpanded = false;
-  bool _relationshipFiltersExpanded = false;
-  bool _basicsFiltersExpanded = false;
-  bool _lifestyleFiltersExpanded = false;
-  bool _languageFiltersExpanded = false;
+  bool _advancedFiltersExpanded = true;
+  bool _professionalFiltersExpanded = true;
+  bool _relationshipFiltersExpanded = true;
+  bool _basicsFiltersExpanded = true;
+  bool _lifestyleFiltersExpanded = true;
+  bool _languageFiltersExpanded = true;
+  bool _profileSettingsExpanded = true; // NEW section
 
   @override
   void initState() {
@@ -100,17 +105,18 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
         if (userData != null && mounted) {
           setState(() {
-            // Load existing preferences
-            _showProfilesWithPhoto = userData['showProfilesWithPhoto'] ?? true;
+            // Load existing preferences - showProfilesWithPhoto defaults to false
+            _showProfilesWithPhoto = userData['showProfilesWithPhoto'] ?? false;
             _showVerifiedOnly = userData['showVerifiedOnly'] ?? false;
             _advancedMatchingEnabled = userData['advancedMatchingEnabled'] ?? false;
             _activityLevel = (userData['activityLevel'] ?? 3).toDouble();
+            _wantVerifiedBadge = userData['wantVerifiedBadge'] ?? false;
 
             if (userData['prioritizedInterests'] != null) {
               _selectedInterests = List<String>.from(userData['prioritizedInterests']);
             }
 
-            // Load new filter preferences
+            // Load other filter preferences
             _filterByProfessional = userData['filterByProfessional'] ?? false;
             _hasJobTitle = userData['filterHasJobTitle'] ?? false;
             _educationLevel = userData['filterEducationLevel'] ?? '';
@@ -150,8 +156,6 @@ class _FiltersScreenState extends State<FiltersScreen> {
     }
   }
 
-// Update the _savePreferences method in lib/screens/filters_screen.dart
-
   Future<void> _savePreferences() async {
     setState(() {
       _isLoading = true;
@@ -171,13 +175,14 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
         await userProvider.updateUserProfile(updatedUser);
 
-        // Save all filter preferences
+        // Save all filter preferences including the new verified badge option
         await FirebaseFirestore.instance.collection('users').doc(user.id).update({
           'showProfilesWithPhoto': _showProfilesWithPhoto,
           'showVerifiedOnly': _showVerifiedOnly,
           'activityLevel': _activityLevel.round(),
           'advancedMatchingEnabled': _advancedMatchingEnabled,
           'prioritizedInterests': _selectedInterests,
+          'wantVerifiedBadge': _wantVerifiedBadge, // NEW
 
           // Professional filters
           'filterByProfessional': _filterByProfessional,
@@ -348,39 +353,119 @@ class _FiltersScreenState extends State<FiltersScreen> {
             onToggle: () => setState(() => _basicFiltersExpanded = !_basicFiltersExpanded),
             isDarkMode: isDarkMode,
             children: [
-              // Age Range
+              // Age Range with enhanced design like distance
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Age Range',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDarkMode ? AppColors.darkTextPrimary : Colors.black,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Age Range',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDarkMode ? AppColors.darkTextPrimary : Colors.black,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: themeColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${_ageRange.start.round()} - ${_ageRange.end.round()}',
+                          style: TextStyle(
+                            color: themeColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // Custom value display
+                  Stack(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? AppColors.darkElevated : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: Text(
+                                '${_ageRange.start.round()}',
+                                style: TextStyle(
+                                  color: themeColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isDarkMode ? AppColors.darkElevated : Colors.grey.shade200,
+                                borderRadius: BorderRadius.circular(15),
+                              ),
+                              child: Text(
+                                '${_ageRange.end.round()}',
+                                style: TextStyle(
+                                  color: themeColor,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 6,
+                      rangeThumbShape: const RoundRangeSliderThumbShape(
+                        enabledThumbRadius: 12,
+                        disabledThumbRadius: 12,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 24,
+                      ),
+                      activeTrackColor: themeColor,
+                      inactiveTrackColor: isDarkMode ? AppColors.darkElevated : Colors.grey.shade300,
+                      thumbColor: Colors.white,
+                      overlayColor: themeColor.withOpacity(0.2),
+                      // Remove the default value indicators
+                      showValueIndicator: ShowValueIndicator.never,
+                    ),
+                    child: RangeSlider(
+                      values: _ageRange,
+                      min: 18,
+                      max: 100,
+                      divisions: 82,
+                      onChanged: (RangeValues values) {
+                        setState(() {
+                          _ageRange = values;
+                        });
+                      },
                     ),
                   ),
-                  RangeSlider(
-                    values: _ageRange,
-                    min: 18,
-                    max: 100,
-                    divisions: 82,
-                    labels: RangeLabels(
-                      '${_ageRange.start.round()}',
-                      '${_ageRange.end.round()}',
-                    ),
-                    onChanged: (RangeValues values) {
-                      setState(() {
-                        _ageRange = values;
-                      });
-                    },
-                    activeColor: themeColor,
-                    inactiveColor: isDarkMode ? AppColors.darkElevated : Colors.grey.shade300,
-                  ),
-                  Text(
-                    'Show people aged ${_ageRange.start.round()} to ${_ageRange.end.round()}',
-                    style: TextStyle(
-                        color: isDarkMode ? AppColors.darkTextSecondary : Colors.grey.shade600
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      'Show people aged ${_ageRange.start.round()} to ${_ageRange.end.round()}',
+                      style: TextStyle(
+                          color: isDarkMode ? AppColors.darkTextSecondary : Colors.grey.shade600,
+                          fontSize: 14
+                      ),
                     ),
                   ),
                 ],
@@ -388,36 +473,70 @@ class _FiltersScreenState extends State<FiltersScreen> {
 
               const SizedBox(height: 24),
 
-              // Distance
+              // Distance with enhanced design
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Maximum Distance',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: isDarkMode ? AppColors.darkTextPrimary : Colors.black,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Maximum Distance',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: isDarkMode ? AppColors.darkTextPrimary : Colors.black,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: themeColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          '${_maxDistance.round()} km',
+                          style: TextStyle(
+                            color: themeColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 6,
+                      thumbShape: const RoundSliderThumbShape(
+                        enabledThumbRadius: 12,
+                      ),
+                      overlayShape: const RoundSliderOverlayShape(
+                        overlayRadius: 24,
+                      ),
+                    ),
+                    child: Slider(
+                      value: _maxDistance,
+                      min: 1,
+                      max: 100,
+                      divisions: 99,
+                      label: '${_maxDistance.round()} km',
+                      onChanged: (double value) {
+                        setState(() {
+                          _maxDistance = value;
+                        });
+                      },
+                      activeColor: themeColor,
+                      inactiveColor: isDarkMode ? AppColors.darkElevated : Colors.grey.shade300,
                     ),
                   ),
-                  Slider(
-                    value: _maxDistance,
-                    min: 1,
-                    max: 100,
-                    divisions: 99,
-                    label: '${_maxDistance.round()} km',
-                    onChanged: (double value) {
-                      setState(() {
-                        _maxDistance = value;
-                      });
-                    },
-                    activeColor: themeColor,
-                    inactiveColor: isDarkMode ? AppColors.darkElevated : Colors.grey.shade300,
-                  ),
-                  Text(
-                    'Show people within ${_maxDistance.round()} km',
-                    style: TextStyle(
-                        color: isDarkMode ? AppColors.darkTextSecondary : Colors.grey.shade600
+                  Center(
+                    child: Text(
+                      'Show people within ${_maxDistance.round()} km',
+                      style: TextStyle(
+                          color: isDarkMode ? AppColors.darkTextSecondary : Colors.grey.shade600,
+                          fontSize: 14
+                      ),
                     ),
                   ),
                 ],
@@ -448,6 +567,56 @@ class _FiltersScreenState extends State<FiltersScreen> {
                   ),
                 ],
               ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // NEW: Profile Settings Section
+          _buildExpandableSection(
+            title: 'Profile Settings',
+            icon: Icons.verified_user,
+            expanded: _profileSettingsExpanded,
+            onToggle: () => setState(() => _profileSettingsExpanded = !_profileSettingsExpanded),
+            isDarkMode: isDarkMode,
+            isPremium: true,
+            children: [
+              _buildSwitchRow(
+                'Add verified badge to my profile',
+                _wantVerifiedBadge,
+                    (value) => setState(() => _wantVerifiedBadge = value),
+                isDarkMode,
+                themeColor,
+                subtitle: 'Show a blue verified badge next to your name',
+                icon: Icons.verified,
+                iconColor: Colors.blue,
+                isPremium: true,
+              ),
+              const SizedBox(height: 8),
+              if (_wantVerifiedBadge)
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Your profile will need to be verified to display the badge',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.blue.shade300 : Colors.blue.shade700,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
 
@@ -529,6 +698,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
             expanded: _professionalFiltersExpanded,
             onToggle: () => setState(() => _professionalFiltersExpanded = !_professionalFiltersExpanded),
             isDarkMode: isDarkMode,
+            isPremium: true,
             children: [
               _buildSwitchRow(
                 'Filter by professional info',
@@ -536,6 +706,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
                     (value) => setState(() => _filterByProfessional = value),
                 isDarkMode,
                 themeColor,
+                isPremium: true,
               ),
               if (_filterByProfessional) ...[
                 const SizedBox(height: 16),
@@ -569,25 +740,36 @@ class _FiltersScreenState extends State<FiltersScreen> {
             expanded: _relationshipFiltersExpanded,
             onToggle: () => setState(() => _relationshipFiltersExpanded = !_relationshipFiltersExpanded),
             isDarkMode: isDarkMode,
+            isPremium: true,
             children: [
-              ModernMultiSelectionField(
-                label: 'Relationship Goals',
-                hint: 'Any relationship goals',
-                selectedValues: _relationshipGoals,
-                icon: Icons.favorite,
-                options: ProfileOptions.relationshipGoals,
-                onChanged: (values) => setState(() => _relationshipGoals = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Relationship Goals',
+                    hint: 'Any relationship goals',
+                    selectedValues: _relationshipGoals,
+                    icon: Icons.favorite,
+                    options: ProfileOptions.relationshipGoals,
+                    onChanged: (values) => setState(() => _relationshipGoals = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Height Preferences',
-                hint: 'Any height',
-                selectedValues: _heightPreferences,
-                icon: Icons.height,
-                options: ProfileOptions.heights,
-                onChanged: (values) => setState(() => _heightPreferences = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Height Preferences',
+                    hint: 'Any height',
+                    selectedValues: _heightPreferences,
+                    icon: Icons.height,
+                    options: ProfileOptions.heights,
+                    onChanged: (values) => setState(() => _heightPreferences = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
             ],
           ),
@@ -601,55 +783,81 @@ class _FiltersScreenState extends State<FiltersScreen> {
             expanded: _basicsFiltersExpanded,
             onToggle: () => setState(() => _basicsFiltersExpanded = !_basicsFiltersExpanded),
             isDarkMode: isDarkMode,
+            isPremium: true,
             children: [
-              ModernMultiSelectionField(
-                label: 'Zodiac Signs',
-                hint: 'Any zodiac sign',
-                selectedValues: _zodiacSigns,
-                icon: Icons.star,
-                options: ProfileOptions.zodiacSigns,
-                onChanged: (values) => setState(() => _zodiacSigns = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Zodiac Signs',
+                    hint: 'Any zodiac sign',
+                    selectedValues: _zodiacSigns,
+                    icon: Icons.star,
+                    options: ProfileOptions.zodiacSigns,
+                    onChanged: (values) => setState(() => _zodiacSigns = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Family Plans',
-                hint: 'Any family plans',
-                selectedValues: _familyPlans,
-                icon: Icons.family_restroom,
-                options: ProfileOptions.familyPlans,
-                onChanged: (values) => setState(() => _familyPlans = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Family Plans',
+                    hint: 'Any family plans',
+                    selectedValues: _familyPlans,
+                    icon: Icons.family_restroom,
+                    options: ProfileOptions.familyPlans,
+                    onChanged: (values) => setState(() => _familyPlans = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Personality Types',
-                hint: 'Any personality type',
-                selectedValues: _personalityTypes,
-                icon: Icons.psychology,
-                options: ProfileOptions.personalityTypes,
-                onChanged: (values) => setState(() => _personalityTypes = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Personality Types',
+                    hint: 'Any personality type',
+                    selectedValues: _personalityTypes,
+                    icon: Icons.psychology,
+                    options: ProfileOptions.personalityTypes,
+                    onChanged: (values) => setState(() => _personalityTypes = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Communication Styles',
-                hint: 'Any communication style',
-                selectedValues: _communicationStyles,
-                icon: Icons.chat,
-                options: ProfileOptions.communicationStyles,
-                onChanged: (values) => setState(() => _communicationStyles = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Communication Styles',
+                    hint: 'Any communication style',
+                    selectedValues: _communicationStyles,
+                    icon: Icons.chat,
+                    options: ProfileOptions.communicationStyles,
+                    onChanged: (values) => setState(() => _communicationStyles = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Love Languages',
-                hint: 'Any love language',
-                selectedValues: _loveLanguages,
-                icon: Icons.favorite_border,
-                options: ProfileOptions.loveLanguages,
-                onChanged: (values) => setState(() => _loveLanguages = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Love Languages',
+                    hint: 'Any love language',
+                    selectedValues: _loveLanguages,
+                    icon: Icons.favorite_border,
+                    options: ProfileOptions.loveLanguages,
+                    onChanged: (values) => setState(() => _loveLanguages = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
             ],
           ),
@@ -663,75 +871,111 @@ class _FiltersScreenState extends State<FiltersScreen> {
             expanded: _lifestyleFiltersExpanded,
             onToggle: () => setState(() => _lifestyleFiltersExpanded = !_lifestyleFiltersExpanded),
             isDarkMode: isDarkMode,
+            isPremium: true,
             children: [
-              ModernMultiSelectionField(
-                label: 'Pet Preferences',
-                hint: 'Any pet preference',
-                selectedValues: _petPreferences,
-                icon: Icons.pets,
-                options: ProfileOptions.petPreferences,
-                onChanged: (values) => setState(() => _petPreferences = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Pet Preferences',
+                    hint: 'Any pet preference',
+                    selectedValues: _petPreferences,
+                    icon: Icons.pets,
+                    options: ProfileOptions.petPreferences,
+                    onChanged: (values) => setState(() => _petPreferences = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Drinking Habits',
-                hint: 'Any drinking habits',
-                selectedValues: _drinkingHabits,
-                icon: Icons.local_bar,
-                options: ProfileOptions.drinkingHabits,
-                onChanged: (values) => setState(() => _drinkingHabits = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Drinking Habits',
+                    hint: 'Any drinking habits',
+                    selectedValues: _drinkingHabits,
+                    icon: Icons.local_bar,
+                    options: ProfileOptions.drinkingHabits,
+                    onChanged: (values) => setState(() => _drinkingHabits = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Smoking Habits',
-                hint: 'Any smoking habits',
-                selectedValues: _smokingHabits,
-                icon: Icons.smoking_rooms,
-                options: ProfileOptions.smokingHabits,
-                onChanged: (values) => setState(() => _smokingHabits = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Smoking Habits',
+                    hint: 'Any smoking habits',
+                    selectedValues: _smokingHabits,
+                    icon: Icons.smoking_rooms,
+                    options: ProfileOptions.smokingHabits,
+                    onChanged: (values) => setState(() => _smokingHabits = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Workout Frequency',
-                hint: 'Any workout frequency',
-                selectedValues: _workoutFrequency,
-                icon: Icons.fitness_center,
-                options: ProfileOptions.workoutFrequency,
-                onChanged: (values) => setState(() => _workoutFrequency = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Workout Frequency',
+                    hint: 'Any workout frequency',
+                    selectedValues: _workoutFrequency,
+                    icon: Icons.fitness_center,
+                    options: ProfileOptions.workoutFrequency,
+                    onChanged: (values) => setState(() => _workoutFrequency = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Dietary Preferences',
-                hint: 'Any dietary preference',
-                selectedValues: _dietaryPreferences,
-                icon: Icons.restaurant,
-                options: ProfileOptions.dietaryPreferences,
-                onChanged: (values) => setState(() => _dietaryPreferences = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Dietary Preferences',
+                    hint: 'Any dietary preference',
+                    selectedValues: _dietaryPreferences,
+                    icon: Icons.restaurant,
+                    options: ProfileOptions.dietaryPreferences,
+                    onChanged: (values) => setState(() => _dietaryPreferences = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Social Media Usage',
-                hint: 'Any social media usage',
-                selectedValues: _socialMediaUsage,
-                icon: Icons.share,
-                options: ProfileOptions.socialMediaUsage,
-                onChanged: (values) => setState(() => _socialMediaUsage = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Social Media Usage',
+                    hint: 'Any social media usage',
+                    selectedValues: _socialMediaUsage,
+                    icon: Icons.share,
+                    options: ProfileOptions.socialMediaUsage,
+                    onChanged: (values) => setState(() => _socialMediaUsage = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
-              ModernMultiSelectionField(
-                label: 'Sleeping Habits',
-                hint: 'Any sleeping habits',
-                selectedValues: _sleepingHabits,
-                icon: Icons.bedtime,
-                options: ProfileOptions.sleepingHabits,
-                onChanged: (values) => setState(() => _sleepingHabits = values),
-                isDarkMode: isDarkMode,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Sleeping Habits',
+                    hint: 'Any sleeping habits',
+                    selectedValues: _sleepingHabits,
+                    icon: Icons.bedtime,
+                    options: ProfileOptions.sleepingHabits,
+                    onChanged: (values) => setState(() => _sleepingHabits = values),
+                    isDarkMode: isDarkMode,
+                  ),
+                ),
               ),
             ],
           ),
@@ -745,16 +989,22 @@ class _FiltersScreenState extends State<FiltersScreen> {
             expanded: _languageFiltersExpanded,
             onToggle: () => setState(() => _languageFiltersExpanded = !_languageFiltersExpanded),
             isDarkMode: isDarkMode,
+            isPremium: true,
             children: [
-              ModernMultiSelectionField(
-                label: 'Must speak these languages',
-                hint: 'Any language',
-                selectedValues: _languagePreferences,
-                icon: Icons.language,
-                options: ProfileOptions.languages,
-                onChanged: (values) => setState(() => _languagePreferences = values),
-                isDarkMode: isDarkMode,
-                maxSelections: 10,
+              GestureDetector(
+                onTap: () => _showPremiumPopup(),
+                child: AbsorbPointer(
+                  child: ModernMultiSelectionField(
+                    label: 'Must speak these languages',
+                    hint: 'Any language',
+                    selectedValues: _languagePreferences,
+                    icon: Icons.language,
+                    options: ProfileOptions.languages,
+                    onChanged: (values) => setState(() => _languagePreferences = values),
+                    isDarkMode: isDarkMode,
+                    maxSelections: 10,
+                  ),
+                ),
               ),
             ],
           ),
@@ -787,6 +1037,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
     required VoidCallback onToggle,
     required bool isDarkMode,
     required List<Widget> children,
+    bool isPremium = false,
   }) {
     return Card(
       color: isDarkMode ? AppColors.darkCard : Colors.white,
@@ -816,15 +1067,49 @@ class _FiltersScreenState extends State<FiltersScreen> {
                       size: 20,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: isDarkMode ? AppColors.darkTextPrimary : Colors.black,
-                      ),
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDarkMode ? AppColors.darkTextPrimary : Colors.black,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isPremium) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.amber, Colors.orange],
+                              ),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.workspace_premium, color: Colors.white, size: 12),
+                                const SizedBox(width: 2),
+                                Text(
+                                  'PREMIUM',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   Icon(
@@ -837,12 +1122,119 @@ class _FiltersScreenState extends State<FiltersScreen> {
           ),
           if (expanded) ...[
             const Divider(height: 1),
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(children: children),
-            ),
+            if (isPremium)
+              Container(
+                color: Colors.amber.withOpacity(0.05),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(children: children),
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(children: children),
+              ),
           ],
         ],
+      ),
+    );
+  }
+
+  void _showPremiumPopup() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.primary.withOpacity(0.9),
+                AppColors.secondary,
+              ],
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.workspace_premium,
+                  color: Colors.white,
+                  size: 48,
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Premium Feature',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Unlock advanced filters and profile settings with Marifecto Premium',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => PremiumScreen()),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    'Get Premium',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text(
+                  'Maybe Later',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -852,22 +1244,79 @@ class _FiltersScreenState extends State<FiltersScreen> {
       bool value,
       Function(bool) onChanged,
       bool isDarkMode,
-      Color themeColor
-      ) {
+      Color themeColor, {
+        String? subtitle,
+        IconData? icon,
+        Color? iconColor,
+        bool isPremium = false,
+      }) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        if (icon != null) ...[
+          Icon(
+            icon,
+            color: iconColor ?? (isDarkMode ? AppColors.darkTextPrimary : Colors.black),
+            size: 24,
+          ),
+          const SizedBox(width: 12),
+        ],
         Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: isDarkMode ? AppColors.darkTextPrimary : Colors.black,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        color: isDarkMode ? AppColors.darkTextPrimary : Colors.black,
+                        fontSize: 14,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                  ),
+                  if (isPremium) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.amber,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        'PREMIUM',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    color: isDarkMode ? AppColors.darkTextSecondary : Colors.grey.shade600,
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+              ],
+            ],
           ),
         ),
         Switch(
           value: value,
-          onChanged: onChanged,
+          onChanged: isPremium ? (newValue) {
+            _showPremiumPopup();
+          } : onChanged,
           activeColor: isDarkMode ? Colors.white : themeColor,
           activeTrackColor: isDarkMode
               ? themeColor
@@ -926,7 +1375,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
                 _ageRange = const RangeValues(18, 50);
                 _maxDistance = 50;
                 _genderPreference = 'Everyone';
-                _showProfilesWithPhoto = true;
+                _showProfilesWithPhoto = false; // Keep false as default
                 _showVerifiedOnly = false;
                 _selectedInterests = [];
                 _advancedMatchingEnabled = false;
@@ -949,6 +1398,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
                 _socialMediaUsage = [];
                 _sleepingHabits = [];
                 _languagePreferences = [];
+                _wantVerifiedBadge = false;
               });
             },
             style: TextButton.styleFrom(foregroundColor: AppColors.error),

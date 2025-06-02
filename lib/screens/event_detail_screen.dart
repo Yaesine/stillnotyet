@@ -115,7 +115,6 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             child: _buildEventInfo(isDarkMode),
           ),
 
-          // Tab Bar
           SliverPersistentHeader(
             pinned: true,
             delegate: _SliverTabBarDelegate(
@@ -130,7 +129,22 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                     : AppColors.textSecondary,
                 tabs: const [
                   Tab(text: 'Overview'),
-                  Tab(text: 'Participants'),
+                  Tab(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min, // Add this to prevent overflow
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.lock_outline, size: 14), // Reduced size
+                        SizedBox(width: 2), // Reduced spacing
+                        Flexible( // Wrap text in Flexible
+                          child: Text(
+                            'Participants',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   Tab(text: 'Activities'),
                 ],
               ),
@@ -304,22 +318,22 @@ class _EventDetailScreenState extends State<EventDetailScreen>
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildStatItem(
-                icon: Icons.people,
-                value: '${widget.event.participants}',
-                label: 'Joined',
-                color: widget.event.primaryColor,
+                icon: Icons.lock_outline,
+                value: 'Private',
+                label: 'Participants',
+                color: Colors.grey,
               ),
               _buildStatItem(
-                icon: Icons.timer,
-                value: widget.event.timeRemaining,
-                label: 'Time Left',
-                color: Colors.orange,
+                icon: Icons.event_busy,
+                value: 'Ended',
+                label: 'Status',
+                color: Colors.red,
               ),
               _buildStatItem(
                 icon: Icons.local_fire_department,
-                value: '89%',
+                value: 'N/A',
                 label: 'Match Rate',
-                color: Colors.red,
+                color: Colors.orange,
               ),
             ],
           ),
@@ -369,7 +383,7 @@ class _EventDetailScreenState extends State<EventDetailScreen>
                           ),
                         ),
                         Text(
-                          'Get unlimited swipes and priority visibility',
+                          'This was a premium exclusive event',
                           style: TextStyle(
                             color: Colors.amber.shade700,
                             fontSize: 12,
@@ -386,7 +400,6 @@ class _EventDetailScreenState extends State<EventDetailScreen>
       ),
     );
   }
-
   Widget _buildStatItem({
     required IconData icon,
     required String value,
@@ -526,22 +539,106 @@ class _EventDetailScreenState extends State<EventDetailScreen>
   }
 
   Widget _buildParticipantsTab(bool isDarkMode) {
-    return GridView.builder(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 0.75,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: 40), // Add top padding
+
+          // Lock icon
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? AppColors.darkCard
+                  : Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.lock_outline,
+              size: 40,
+              color: isDarkMode
+                  ? AppColors.darkTextSecondary
+                  : Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Title
+          Text(
+            'Participants List is Private',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode
+                  ? AppColors.darkTextPrimary
+                  : AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Description
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'To protect user privacy, participant information is not available for ended events.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: isDarkMode
+                    ? AppColors.darkTextSecondary
+                    : AppColors.textSecondary,
+                height: 1.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Privacy info
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDarkMode
+                  ? AppColors.darkElevated.withOpacity(0.5)
+                  : Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isDarkMode
+                    ? AppColors.darkDivider
+                    : Colors.blue.shade200,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: isDarkMode
+                      ? Colors.blue.shade300
+                      : Colors.blue.shade600,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'This helps maintain privacy and security for all users',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isDarkMode
+                          ? Colors.blue.shade300
+                          : Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 40), // Add bottom padding
+        ],
       ),
-      itemCount: _eventParticipants.length,
-      itemBuilder: (context, index) {
-        final user = _eventParticipants[index];
-        return FadeInAnimation(
-          delay: Duration(milliseconds: index * 50),
-          child: _buildParticipantCard(user, isDarkMode),
-        );
-      },
     );
   }
 

@@ -608,24 +608,14 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 // Rewind button (could be premium feature)
+                // Rewind button (could be premium feature)
                 SwipeActionButton(
                   icon: Icons.replay,
                   color: Colors.amber,
                   onTap: () {
-                    // Implement rewind functionality (premium feature)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Upgrade to premium to unlock this feature'),
-                        behavior: SnackBarBehavior.floating,
-                        action: SnackBarAction(
-                          label: 'UPGRADE',
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(builder: (context) => PremiumScreen()),
-                            );
-                          },
-                        ),
-                      ),
+                    // Navigate directly to premium screen
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => PremiumScreen()),
                     );
                   },
                   size: 44,

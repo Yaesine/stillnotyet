@@ -62,24 +62,11 @@ class ExploreEvent {
 
   });
 
-  bool get isActive {
-    final now = DateTime.now();
-    return now.isAfter(startDate) && now.isBefore(endDate);
-  }
+  bool get isActive => false;
 
-  String get timeRemaining {
-    final now = DateTime.now();
-    if (!isActive) return 'Ended';
 
-    final difference = endDate.difference(now);
-    if (difference.inDays > 0) {
-      return '${difference.inDays}d left';
-    } else if (difference.inHours > 0) {
-      return '${difference.inHours}h left';
-    } else {
-      return '${difference.inMinutes}m left';
-    }
-  }
+  String get timeRemaining => 'Ended';
+
 }
 
 class ExploreScreen extends StatefulWidget {
@@ -373,36 +360,14 @@ class _ExploreScreenState extends State<ExploreScreen>
             ),
           ),
           const Spacer(),
-          // Filter button
-          IconButton(
-            onPressed: () {
-              Navigator.pushNamed(context, '/filters');
-            },
-            icon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: isDarkMode ? AppColors.darkCard : Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.tune,
-                color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
-              ),
-            ),
-          ),
+          // Removed the filter button
         ],
       ),
     );
   }
 
   Widget _buildTabBar(bool isDarkMode) {
-    // Set colors based on the current theme (matching LikesScreen style)
+    // Set colors based on the current theme
     final backgroundColor = isDarkMode ? AppColors.darkCard : Colors.grey.shade200;
     final selectedBgColor = isDarkMode ? AppColors.primary : AppColors.primary;
     final unselectedTextColor = isDarkMode ? AppColors.darkTextSecondary : Colors.grey;
@@ -410,98 +375,127 @@ class _ExploreScreenState extends State<ExploreScreen>
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-      height: 56, // Main tab bar height
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Row(
+      height: 56,
+      child: Stack(
         children: [
-          // Discover Tab
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                _tabController.animateTo(0);
-              },
-              child: Center(
-                child: Container(
-                  height: 48, // Taller than text but not full container height
-                  width: double.infinity, // Make it fill the width
-                  decoration: BoxDecoration(
-                    color: _tabController.index == 0 ? selectedBgColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Discover',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: _tabController.index == 0 ? selectedTextColor : unselectedTextColor,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+          // Background
+          Container(
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(28),
             ),
           ),
-
-          // Categories Tab
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                _tabController.animateTo(1);
-              },
-              child: Center(
+          // Animated sliding indicator
+          AnimatedBuilder(
+            animation: _tabController.animation!,
+            builder: (context, child) {
+              final double animationValue = _tabController.animation!.value;
+              return Positioned(
+                left: animationValue * (MediaQuery.of(context).size.width - 40) / 3,
                 child: Container(
-                  height: 48, // Taller than text but not full container height
-                  width: double.infinity, // Make it fill the width
-                  decoration: BoxDecoration(
-                    color: _tabController.index == 1 ? selectedBgColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Categories',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: _tabController.index == 1 ? selectedTextColor : unselectedTextColor,
-                      ),
+                  width: (MediaQuery.of(context).size.width - 40) / 3,
+                  height: 56,
+                  padding: const EdgeInsets.all(4),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: selectedBgColor,
+                      borderRadius: BorderRadius.circular(24),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
-
-          // Events Tab
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                _tabController.animateTo(2);
-              },
-              child: Center(
-                child: Container(
-                  height: 48, // Taller than text but not full container height
-                  width: double.infinity, // Make it fill the width
-                  decoration: BoxDecoration(
-                    color: _tabController.index == 2 ? selectedBgColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Events',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: _tabController.index == 2 ? selectedTextColor : unselectedTextColor,
+          // Tab items
+          Row(
+            children: [
+              // Discover Tab
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    _tabController.animateTo(0);
+                  },
+                  child: Container(
+                    color: Colors.transparent,
+                    child: Center(
+                      child: AnimatedBuilder(
+                        animation: _tabController.animation!,
+                        builder: (context, child) {
+                          final double animationValue = _tabController.animation!.value;
+                          final bool isSelected = animationValue >= -0.5 && animationValue < 0.5;
+                          return Text(
+                            'Discover',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? selectedTextColor : unselectedTextColor,
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
+
+              // Categories Tab
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    _tabController.animateTo(1);
+                  },
+                  child: Container(
+                    color: Colors.transparent,
+                    child: Center(
+                      child: AnimatedBuilder(
+                        animation: _tabController.animation!,
+                        builder: (context, child) {
+                          final double animationValue = _tabController.animation!.value;
+                          final bool isSelected = animationValue >= 0.5 && animationValue < 1.5;
+                          return Text(
+                            'Categories',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? selectedTextColor : unselectedTextColor,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Events Tab
+              Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    _tabController.animateTo(2);
+                  },
+                  child: Container(
+                    color: Colors.transparent,
+                    child: Center(
+                      child: AnimatedBuilder(
+                        animation: _tabController.animation!,
+                        builder: (context, child) {
+                          final double animationValue = _tabController.animation!.value;
+                          final bool isSelected = animationValue >= 1.5;
+                          return Text(
+                            'Events',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: isSelected ? selectedTextColor : unselectedTextColor,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1150,16 +1144,55 @@ class _ExploreScreenState extends State<ExploreScreen>
   }
 
   Widget _buildCategoriesTab(bool isDarkMode) {
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.all(20),
-      itemCount: _categories.length,
-      itemBuilder: (context, index) {
-        final category = _categories[index];
-        return FadeInAnimation(
-          delay: Duration(milliseconds: index * 100),
-          child: _buildCategoryCard(category, isDarkMode),
-        );
-      },
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.only(bottom: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Browse Categories',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Find people who share your interests',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // Categories Grid
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            childAspectRatio: 1.1,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+          ),
+          itemCount: _categories.length,
+          itemBuilder: (context, index) {
+            final category = _categories[index];
+            return FadeInAnimation(
+              delay: Duration(milliseconds: index * 100),
+              child: _buildCategoryCard(category, isDarkMode),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -1167,101 +1200,151 @@ class _ExploreScreenState extends State<ExploreScreen>
     return GestureDetector(
       onTap: () => _openCategory(category),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: isDarkMode ? AppColors.darkCard : Colors.white,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              category.color.withOpacity(0.8),
+              category.color.withOpacity(0.6),
+            ],
+          ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
+              color: category.color.withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 6),
             ),
           ],
         ),
-        child: Row(
+        child: Stack(
           children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: category.color.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Center(
-                child: Text(
-                  category.emoji,
-                  style: const TextStyle(fontSize: 32),
-                ),
+            // Background pattern
+            Positioned(
+              right: -20,
+              bottom: -20,
+              child: Icon(
+                _getCategoryIcon(category.id),
+                size: 100,
+                color: Colors.white.withOpacity(0.1),
               ),
             ),
-            const SizedBox(width: 16),
-            Expanded(
+
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Emoji in a white circle
+                  Container(
+                    width: 45, // Reduced from 50
+                    height: 45, // Reduced from 50
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        category.emoji,
+                        style: const TextStyle(fontSize: 24), // Reduced from 28
+                      ),
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  // Category name
                   Text(
                     category.name,
-                    style: TextStyle(
-                      fontSize: 18,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16, // Reduced from 18
                       fontWeight: FontWeight.bold,
-                      color: isDarkMode
-                          ? AppColors.darkTextPrimary
-                          : AppColors.textPrimary,
+                      height: 1.2, // Add line height
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+
                   const SizedBox(height: 4),
-                  Text(
-                    '${category.activeUsers} active members',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isDarkMode
-                          ? AppColors.darkTextSecondary
-                          : AppColors.textSecondary,
+
+                  // Active users count
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), // Reduced padding
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(10), // Reduced from 12
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    children: category.relatedInterests.take(3).map((interest) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: category.color.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: category.color.withOpacity(0.3),
-                            width: 1,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 5, // Reduced from 6
+                          height: 5, // Reduced from 6
+                          decoration: const BoxDecoration(
+                            color: Colors.greenAccent,
+                            shape: BoxShape.circle,
                           ),
                         ),
-                        child: Text(
-                          interest,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: category.color,
+                        const SizedBox(width: 4),
+                        Text(
+                          '${category.activeUsers} active',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11, // Reduced from 12
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                      );
-                    }).toList(),
+                      ],
+                    ),
                   ),
                 ],
               ),
             ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: isDarkMode
-                  ? AppColors.darkTextSecondary
-                  : AppColors.textSecondary,
-              size: 16,
+
+            // Ripple effect
+            Positioned.fill(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _openCategory(category),
+                  borderRadius: BorderRadius.circular(20),
+                  splashColor: Colors.white.withOpacity(0.2),
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+// Helper method to get icons for categories
+  IconData _getCategoryIcon(String categoryId) {
+    switch (categoryId) {
+      case 'music_lovers':
+        return Icons.music_note;
+      case 'foodies':
+        return Icons.restaurant;
+      case 'pet_parents':
+        return Icons.pets;
+      case 'fitness':
+        return Icons.fitness_center;
+      case 'travelers':
+        return Icons.flight;
+      case 'gamers':
+        return Icons.sports_esports;
+      default:
+        return Icons.category;
+    }
   }
 
   Widget _buildEventsTab(bool isDarkMode) {
@@ -1289,10 +1372,14 @@ class _ExploreScreenState extends State<ExploreScreen>
           image: DecorationImage(
             image: NetworkImage(event.imageUrl),
             fit: BoxFit.cover,
+            colorFilter: ColorFilter.mode(
+              Colors.black.withOpacity(0.3), // Darken ended events
+              BlendMode.darken,
+            ),
           ),
           boxShadow: [
             BoxShadow(
-              color: event.primaryColor.withOpacity(0.2),
+              color: Colors.grey.withOpacity(0.3), // Grey shadow for ended events
               blurRadius: 15,
               spreadRadius: 2,
             ),
@@ -1315,7 +1402,7 @@ class _ExploreScreenState extends State<ExploreScreen>
               ),
             ),
 
-            // Event status badge
+            // Event status badge - Always show ENDED
             Positioned(
               top: 16,
               left: 16,
@@ -1325,20 +1412,20 @@ class _ExploreScreenState extends State<ExploreScreen>
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: event.isActive ? Colors.green : Colors.red,
+                  color: Colors.red.withOpacity(0.9),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      event.isActive ? Icons.circle : Icons.cancel,
+                      Icons.event_busy,
                       color: Colors.white,
                       size: 12,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      event.isActive ? 'LIVE' : 'ENDED',
+                      'ENDED',
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -1391,7 +1478,7 @@ class _ExploreScreenState extends State<ExploreScreen>
                     end: Alignment.bottomCenter,
                     colors: [
                       Colors.transparent,
-                      event.primaryColor.withOpacity(0.3),
+                      Colors.black.withOpacity(0.5),
                     ],
                   ),
                 ),
@@ -1435,16 +1522,12 @@ class _ExploreScreenState extends State<ExploreScreen>
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        _buildEventStat(
-                          Icons.people,
-                          '${event.participants}',
-                          'Joined',
-                        ),
+
                         const SizedBox(width: 24),
                         _buildEventStat(
-                          Icons.timer,
-                          event.timeRemaining,
-                          'Left',
+                          Icons.event_busy,
+                          'Event',
+                          'Ended',
                         ),
                       ],
                     ),
@@ -1486,7 +1569,6 @@ class _ExploreScreenState extends State<ExploreScreen>
       ],
     );
   }
-
   // Navigation methods
   void _openUserProfile(User user) {
     Navigator.push(
