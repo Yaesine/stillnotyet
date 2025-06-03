@@ -298,7 +298,7 @@ class FirestoreService {
       int ageRangeStart = userData['ageRangeStart'] ?? 18;
       int ageRangeEnd = userData['ageRangeEnd'] ?? 50;
       int maxDistance = userData['distance'] ?? 50;
-      bool showProfilesWithPhoto = userData['showProfilesWithPhoto'] ?? true;
+      bool showProfilesWithPhoto = userData['showProfilesWithPhoto'] ?? false;
 
       print('Filter preferences:');
       print('- Looking for: $lookingFor');
