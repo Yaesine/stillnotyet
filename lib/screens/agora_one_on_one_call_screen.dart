@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -23,7 +24,12 @@ enum CallState {
 }
 
 class AgoraOneOnOneCallScreen extends StatefulWidget {
-  const AgoraOneOnOneCallScreen({Key? key}) : super(key: key);
+  final bool isFullScreen;
+
+  const AgoraOneOnOneCallScreen({
+    Key? key,
+    this.isFullScreen = false,
+  }) : super(key: key);
 
   @override
   _AgoraOneOnOneCallScreenState createState() => _AgoraOneOnOneCallScreenState();
@@ -68,19 +74,37 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     super.initState();
     _initializeAnimations();
     _checkPermissionsAndInitialize();
-    // Request permissions on first launch to make them appear in iOS settings
     _ensurePermissionsInSettings();
+
+    // Set fullscreen mode if requested
+    if (widget.isFullScreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+  }
+
+  @override
+  void dispose() {
+    // Restore system UI when leaving
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+    _pulseController.dispose();
+    _slideController.dispose();
+    _searchTimer?.cancel();
+    _callTimer?.cancel();
+    _messageTimer?.cancel();
+    _hideControlsTimer?.cancel();
+    _matchingTimeout?.cancel();
+    _queueManager.stopListening();
+    _agoraService.removeFromQueue();
+    _agoraService.dispose();
+    super.dispose();
   }
 
   Future<void> _ensurePermissionsInSettings() async {
-    // Check if this is the first time requesting permissions
     final cameraStatus = await Permission.camera.status;
     final micStatus = await Permission.microphone.status;
 
-    // If permissions have never been requested, they won't appear in iOS settings
     if (cameraStatus == PermissionStatus.denied && micStatus == PermissionStatus.denied) {
-      // Just check status to trigger iOS to add them to settings
-      // This won't show any dialog, just registers the permissions
       await Permission.camera.status;
       await Permission.microphone.status;
     }
@@ -117,20 +141,16 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
   }
 
   Future<void> _checkPermissionsAndInitialize() async {
-    // Check if permissions are already granted
     final cameraStatus = await Permission.camera.status;
     final micStatus = await Permission.microphone.status;
 
     if (cameraStatus == PermissionStatus.granted &&
         micStatus == PermissionStatus.granted) {
-      // Permissions granted, initialize Agora
       await _initializeAgora();
     }
-    // Otherwise, we'll request permissions when user taps Start Call
   }
 
   Future<void> _initializeAgora() async {
-    // Set up Agora callbacks
     _agoraService.onUserJoined = (uid) {
       print('Remote user joined: $uid');
       setState(() {
@@ -154,31 +174,13 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       });
     };
 
-    // Initialize Agora engine
     bool initialized = await _agoraService.initialize();
     if (!initialized) {
       print('Failed to initialize Agora');
-      // Don't set error state here, as it might be due to permissions
     }
   }
 
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    _slideController.dispose();
-    _searchTimer?.cancel();
-    _callTimer?.cancel();
-    _messageTimer?.cancel();
-    _hideControlsTimer?.cancel();
-    _matchingTimeout?.cancel();
-    _queueManager.stopListening();
-    _agoraService.removeFromQueue();
-    _agoraService.dispose();
-    super.dispose();
-  }
-
   void _startSearching() async {
-    // Check permissions first
     bool hasPermissions = await PermissionHandlerDialog.checkAndRequestPermissions(context);
     if (!hasPermissions) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -190,7 +192,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       return;
     }
 
-    // Initialize Agora if not already initialized
     if (!_agoraService.isInitialized) {
       bool initialized = await _agoraService.initialize();
       if (!initialized) {
@@ -213,7 +214,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       _callDuration = 0;
     });
 
-    // Start rotating messages
     _messageTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted) {
         setState(() {
@@ -222,19 +222,15 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       }
     });
 
-    // Start listening for matches
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     if (currentUserId != null) {
       _queueManager.startListening(currentUserId, (matchedUserId) async {
-        // Found a match!
         await _handleMatch(matchedUserId);
       });
     }
 
-    // Try to find a match
     _findMatch();
 
-    // Set timeout for matching
     _matchingTimeout = Timer(const Duration(seconds: 30), () {
       if (_callState == CallState.searching) {
         setState(() {
@@ -252,7 +248,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
 
   Future<void> _findMatch() async {
     try {
-      // Find a random match using the service
       final matchedUser = await _agoraService.findRandomMatch();
 
       if (matchedUser != null && mounted) {
@@ -276,7 +271,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
         _callState = CallState.connecting;
       });
 
-      // Get matched user data
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(matchedUserId)
@@ -286,17 +280,14 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
 
       final matchedUser = app_models.User.fromFirestore(userDoc);
 
-      // Create or join call room
       String? roomId = await _agoraService.createCallRoom(matchedUserId);
       if (roomId == null) {
-        // Try to join existing room
         roomId = '${matchedUserId}_${FirebaseAuth.instance.currentUser?.uid}_call';
         await _agoraService.joinCallRoom(roomId);
       }
 
       _currentRoomId = roomId;
 
-      // Join Agora channel
       bool joined = await _agoraService.joinChannel(roomId);
 
       if (joined && mounted) {
@@ -329,7 +320,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       }
     });
 
-    // Auto-hide controls after 3 seconds
     _resetHideControlsTimer();
   }
 
@@ -351,15 +341,12 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     _hideControlsTimer?.cancel();
     _matchingTimeout?.cancel();
 
-    // Leave Agora channel
     await _agoraService.leaveChannel();
 
-    // End call room
     if (_currentRoomId != null) {
       await _agoraService.endCallRoom(_currentRoomId!);
     }
 
-    // Remove from queue
     await _agoraService.removeFromQueue();
 
     setState(() {
@@ -382,23 +369,96 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     return '${minutes.toString().padLeft(2, '0')}:${remainingSeconds.toString().padLeft(2, '0')}';
   }
 
+  Widget _buildOpenFullscreenButton() {
+    return Positioned(
+      top: MediaQuery.of(context).padding.top + 60,
+      right: 16,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(25),
+        ),
+        child: IconButton(
+          icon: const Icon(
+            Icons.fullscreen,
+            color: Colors.white,
+            size: 28,
+          ),
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const AgoraOneOnOneCallScreen(isFullScreen: true),
+                fullscreenDialog: true,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
+    // For fullscreen mode, use a different scaffold
+    if (widget.isFullScreen) {
+      return WillPopScope(
+        onWillPop: () async {
+          if (_callState == CallState.connected) {
+            // Show confirmation dialog before leaving during a call
+            final shouldLeave = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('End Call?'),
+                content: const Text('Are you sure you want to end this call?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: const Text('End Call'),
+                    style: TextButton.styleFrom(foregroundColor: Colors.red),
+                  ),
+                ],
+              ),
+            );
+
+            if (shouldLeave ?? false) {
+              await _endCall();
+              return true;
+            }
+            return false;
+          }
+          return true;
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              _buildMainContent(),
+              if (_callState == CallState.connected && _showControls)
+                _buildCallControls(),
+              _buildTopBar(),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Regular mode with tab bar
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.grey.shade900,
       body: Stack(
         children: [
-          // Main content
           _buildMainContent(),
-
-          // Controls overlay
           if (_callState == CallState.connected && _showControls)
             _buildCallControls(),
-
-          // Top bar
           _buildTopBar(),
+          if (!widget.isFullScreen && _callState != CallState.idle)
+            _buildOpenFullscreenButton(),
         ],
       ),
     );
@@ -426,7 +486,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Icon animation
           ScaleTransition(
             scale: _pulseAnimation,
             child: Container(
@@ -473,7 +532,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
             ),
           ),
           const SizedBox(height: 20),
-          // Permission status indicators
           FutureBuilder<Map<Permission, PermissionStatus>>(
             future: Future.wait([
               Permission.camera.status,
@@ -536,7 +594,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
             },
           ),
           const SizedBox(height: 20),
-          // Start button
           GestureDetector(
             onTap: _startSearching,
             child: Container(
@@ -580,14 +637,12 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Animated circles
           SizedBox(
             width: 200,
             height: 200,
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // Outer circle
                 AnimatedBuilder(
                   animation: _pulseController,
                   builder: (context, child) {
@@ -604,7 +659,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
                     );
                   },
                 ),
-                // Middle circle
                 AnimatedBuilder(
                   animation: _pulseController,
                   builder: (context, child) {
@@ -621,7 +675,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
                     );
                   },
                 ),
-                // Center icon
                 Container(
                   width: 80,
                   height: 80,
@@ -644,7 +697,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
             ),
           ),
           const SizedBox(height: 40),
-          // Animated text
           AnimatedSwitcher(
             duration: const Duration(milliseconds: 500),
             child: Text(
@@ -657,7 +709,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
             ),
           ),
           const SizedBox(height: 60),
-          // Cancel button
           TextButton(
             onPressed: () async {
               await _agoraService.removeFromQueue();
@@ -728,7 +779,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       },
       child: Stack(
         children: [
-          // Remote user video
           Positioned.fill(
             child: _agoraService.remoteUid != null
                 ? _agoraService.createRemoteVideoView(_agoraService.remoteUid!)
@@ -758,7 +808,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
             ),
           ),
 
-          // Blur effect when camera is off
           if (_agoraService.isVideoDisabled)
             Positioned.fill(
               child: BackdropFilter(
@@ -789,9 +838,8 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
               ),
             ),
 
-          // Local user video (small preview in corner)
           Positioned(
-            top: MediaQuery.of(context).padding.top + 80,
+            top: MediaQuery.of(context).padding.top + (widget.isFullScreen ? 20 : 80),
             right: 16,
             child: SlideTransition(
               position: _slideAnimation,
@@ -816,7 +864,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
             ),
           ),
 
-          // User info overlay
           if (_showControls)
             Positioned(
               bottom: 120,
@@ -1009,7 +1056,43 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            // Call duration
+            if (widget.isFullScreen)
+              IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios,
+                  color: Colors.white,
+                ),
+                onPressed: () async {
+                  if (_callState == CallState.connected) {
+                    final shouldLeave = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('End Call?'),
+                        content: const Text('Are you sure you want to end this call?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('End Call'),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (shouldLeave ?? false) {
+                      await _endCall();
+                      Navigator.of(context).pop();
+                    }
+                  } else {
+                    Navigator.of(context).pop();
+                  }
+                },
+              ),
+
             if (_callState == CallState.connected)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1039,7 +1122,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
             else
               const SizedBox.shrink(),
 
-            // Status
             if (_callState == CallState.searching)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1071,11 +1153,9 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
                 ),
               ),
 
-            // Settings
-            if (_callState == CallState.idle)
+            if (_callState == CallState.idle && !widget.isFullScreen)
               IconButton(
                 onPressed: () {
-                  // Show settings or filters
                   _showCallSettings();
                 },
                 icon: const Icon(
@@ -1112,7 +1192,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // Mute button
             _buildControlButton(
               icon: _agoraService.isMuted ? Icons.mic_off : Icons.mic,
               onPressed: () async {
@@ -1122,7 +1201,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
               isActive: !_agoraService.isMuted,
             ),
 
-            // Camera toggle
             _buildControlButton(
               icon: _agoraService.isVideoDisabled ? Icons.videocam_off : Icons.videocam,
               onPressed: () async {
@@ -1132,17 +1210,18 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
               isActive: !_agoraService.isVideoDisabled,
             ),
 
-            // End call button
             _buildControlButton(
               icon: Icons.call_end,
               onPressed: () async {
                 setState(() => _callState = CallState.disconnected);
                 await _endCall();
+                if (widget.isFullScreen) {
+                  Navigator.of(context).pop();
+                }
               },
               isEndCall: true,
             ),
 
-            // Switch camera
             _buildControlButton(
               icon: Icons.cameraswitch,
               onPressed: () async {
@@ -1151,7 +1230,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
               isActive: true,
             ),
 
-            // Next button
             _buildControlButton(
               icon: Icons.skip_next,
               onPressed: _skipToNext,
