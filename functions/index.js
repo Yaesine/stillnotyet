@@ -4,8 +4,45 @@ const admin = require("firebase-admin");
 const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onCall} = require("firebase-functions/v2/https");
+const {RtcTokenBuilder, RtcRole} = require("agora-token");
 
 admin.initializeApp();
+
+exports.generateAgoraToken = onCall(async (request) => {
+  // Verify user is authenticated
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+  }
+
+  try {
+    const APP_ID = "1abf8e98afd04b01a8637ddc4bfbf3d1";
+    const APP_CERTIFICATE = "549ad431723d401ab539ab2513a5b857";
+
+    const channelName = request.data.channelName;
+    const uid = request.data.uid || 0;
+    const role = RtcRole.PUBLISHER;
+
+    const expirationTimeInSeconds = 3600;
+    const currentTimestamp = Math.floor(Date.now() / 1000);
+    const privilegeExpiredTs = currentTimestamp + expirationTimeInSeconds;
+
+    const token = RtcTokenBuilder.buildTokenWithUid(
+      APP_ID,
+      APP_CERTIFICATE,
+      channelName,
+      uid,
+      role,
+      privilegeExpiredTs,
+    );
+
+    console.log(`Generated Agora token for channel: ${channelName}, uid: ${uid}`);
+
+    return {token};
+  } catch (error) {
+    console.error("Error generating Agora token:", error);
+    throw new functions.https.HttpsError("internal", error.message);
+  }
+});
 
 exports.processAllPendingNotifications = onCall(async (request) => {
   try {

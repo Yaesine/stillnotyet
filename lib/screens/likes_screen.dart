@@ -1,4 +1,4 @@
-// lib/screens/likes_screen.dart - Updated with LIVE tab
+// lib/screens/likes_screen.dart - Updated with one-on-one call feature
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -15,6 +15,7 @@ import '../animations/modern_match_animation.dart';
 import '../animations/animations.dart';
 import '../screens/modern_chat_screen.dart';
 import '../screens/premium_screen.dart';
+import 'agora_one_on_one_call_screen.dart';
 
 class LikesScreen extends StatefulWidget {
   const LikesScreen({Key? key}) : super(key: key);
@@ -32,80 +33,6 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
 
   // Premium state - set to false by default to require upgrade
   bool _hasPremium = false;
-
-  // Mock data for live broadcasts
-  final List<Map<String, dynamic>> _liveUsers = [
-    {
-      'id': 'live_1',
-      'userId': 'user_3',
-      'name': 'Celena',
-      'age': 30,
-      'title': 'Beach day in Abu Dhabi',
-      'viewerCount': 127,
-      'duration': '32:15',
-      'imageUrl': 'https://images.unsplash.com/photo-1622347434466-147a44cffda7?q=80&w=1935&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-      'isPrivate': false,
-      'isSoldOut': false,
-      'hasJoined': false,
-      'startedAt': DateTime.now().subtract(const Duration(minutes: 32)),
-    },
-    {
-      'id': 'live_2',
-      'userId': 'test_user_1',
-      'name': 'Sophia',
-      'age': 28,
-      'title': 'Answering your travel questions!',
-      'viewerCount': 45,
-      'duration': '15:08',
-      'imageUrl': 'https://images.unsplash.com/photo-1484608856193-968d2be4080e?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MTUyfHxXT01BTnxlbnwwfHwwfHx8MA%3D%3D',
-      'isPrivate': true,
-      'isSoldOut': true,
-      'hasJoined': false,
-      'startedAt': DateTime.now().subtract(const Duration(minutes: 15)),
-    },
-    {
-      'id': 'live_3',
-      'userId': 'test_user_2',
-      'name': 'Laila',
-      'age': 18,
-      'title': 'Architecture studio tour',
-      'viewerCount': 56,
-      'duration': '07:22',
-      'imageUrl': 'https://images.pexels.com/photos/2205647/pexels-photo-2205647.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
-      'isPrivate': true,
-      'isSoldOut': false,
-      'hasJoined': true,
-      'startedAt': DateTime.now().subtract(const Duration(minutes: 7)),
-    },
-    {
-      'id': 'live_4',
-      'userId': 'user_123',
-      'name': 'Alex',
-      'age': 29,
-      'title': 'Morning workout routine',
-      'viewerCount': 210,
-      'duration': '47:33',
-      'imageUrl': 'https://i.pravatar.cc/300?img=33',
-      'isPrivate': false,
-      'isSoldOut': false,
-      'hasJoined': false,
-      'startedAt': DateTime.now().subtract(const Duration(minutes: 47)),
-    },
-    {
-      'id': 'live_5',
-      'userId': 'test_user_5',
-      'name': 'Emma',
-      'age': 24,
-      'title': 'Private Q&A Session',
-      'viewerCount': 10,
-      'duration': '05:42',
-      'imageUrl': 'https://images.unsplash.com/photo-1502323777036-f29e3972d82f?q=80&w=1770&auto=format&fit=crop&ixlib=rb-4.1.0',
-      'isPrivate': true,
-      'isSoldOut': true,
-      'hasJoined': false,
-      'startedAt': DateTime.now().subtract(const Duration(minutes: 5)),
-    },
-  ];
 
   @override
   void initState() {
@@ -210,8 +137,8 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
                       // Combined Visitors Tab (current + history)
                       _buildVisitorsTab(allVisitors),
 
-                      // New LIVE Events Tab
-                      _buildLiveTab(),
+                      // New One-on-One Call Tab
+                      const AgoraOneOnOneCallScreen(),
                     ],
                   );
                 },
@@ -344,9 +271,6 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
     );
   }
 
-
-  // Updated _buildTabBar method for lib/screens/likes_screen.dart
-
   Widget _buildTabBar() {
     // Get the current brightness to determine dark mode status
     final brightness = Theme.of(context).brightness;
@@ -443,7 +367,7 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
             ),
           ),
 
-          // LIVE Tab
+          // Call Tab
           Expanded(
             child: GestureDetector(
               onTap: () {
@@ -462,12 +386,12 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        _tabController.index == 2 ? Icons.live_tv : Icons.live_tv_outlined,
+                        _tabController.index == 2 ? Icons.video_call : Icons.video_call_outlined,
                         color: _tabController.index == 2 ? selectedTextColor : unselectedTextColor,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        'LIVE',
+                        'Call',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -481,39 +405,6 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
             ),
           ),
         ],
-      ),
-    );
-  }
-
-// New method to build tabs with complete background fill
-  Widget _buildFullTab(int index, IconData selectedIcon, IconData unselectedIcon, String label) {
-    final isSelected = _tabController.index == index;
-
-    return Tab(
-      child: Container(
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isSelected ? selectedIcon : unselectedIcon,
-              color: isSelected ? Colors.white : Colors.grey,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : Colors.grey,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -640,8 +531,6 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
     );
   }
 
-// Update this method in lib/screens/likes_screen.dart
-
   Widget _buildVisitorsTab(List<Map<String, dynamic>> allVisitors) {
     if (allVisitors.isEmpty) {
       return _buildEmptyState(
@@ -675,8 +564,6 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              // Add a refresh button to manually reload visitors data
-
             ],
           ),
         ),
@@ -705,392 +592,6 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
           ),
         ),
       ],
-    );
-  }
-  // New method to build the LIVE tab (Instagram-style broadcasts in grid)
-  Widget _buildLiveTab() {
-    if (_liveUsers.isEmpty) {
-      return _buildEmptyState(
-        icon: Icons.videocam_off,
-        title: 'No Live Broadcasts',
-        message: 'When users go live, they will appear here',
-        iconColor: Colors.purple,
-        iconBackgroundColor: Colors.purple.withOpacity(0.1),
-      );
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Live Now',
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  // Start a broadcast
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Coming soon: Start your own broadcast'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                },
-                icon: Icon(Icons.videocam),
-                label: Text('Go Live'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: BorderSide(color: AppColors.primary),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        Expanded(
-          child: GridView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              childAspectRatio: 0.75,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
-            ),
-            itemCount: _liveUsers.length,
-            itemBuilder: (context, index) {
-              var live = _liveUsers[index];
-
-              return FadeInAnimation(
-                delay: Duration(milliseconds: 50 * index),
-                child: _buildLiveBroadcastCard(live),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  // Method to build live broadcast cards (grid style)
-  Widget _buildLiveBroadcastCard(Map<String, dynamic> live) {
-    bool isPrivate = live['isPrivate'] ?? false;
-    bool isSoldOut = live['isSoldOut'] ?? false;
-    bool hasJoined = live['hasJoined'] ?? false;
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 4,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Profile image as background
-          CachedNetworkImage(
-            imageUrl: live['imageUrl'],
-            fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: Colors.grey.shade200,
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: Colors.grey.shade200,
-              child: Icon(Icons.error, size: 40, color: Colors.grey),
-            ),
-          ),
-
-          // Gradient overlay for visibility
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withOpacity(0.3),
-                    Colors.transparent,
-                    Colors.black.withOpacity(0.8),
-                  ],
-                  stops: const [0.0, 0.5, 0.8],
-                ),
-              ),
-            ),
-          ),
-
-          // Content layout
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Top row with LIVE badge and duration
-              Padding(
-                padding: const EdgeInsets.all(10.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // LIVE badge
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 4,
-                            offset: Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            'LIVE',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Duration badge
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        live['duration'],
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Spacer to push content to bottom
-              Spacer(),
-
-              // Bottom info
-              Padding(
-                padding: const EdgeInsets.all(10.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // User info row
-                    Row(
-                      children: [
-                        // Small avatar
-                        Container(
-                          width: 24,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            image: DecorationImage(
-                              image: CachedNetworkImageProvider(live['imageUrl']),
-                              fit: BoxFit.cover,
-                            ),
-                            border: Border.all(
-                              color: Colors.white,
-                              width: 1,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 6),
-                        // Name and age
-                        Expanded(
-                          child: Text(
-                            '${live['name']}, ${live['age']}',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                              shadows: [
-                                Shadow(
-                                  color: Colors.black.withOpacity(0.8),
-                                  blurRadius: 4,
-                                ),
-                              ],
-                            ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 4),
-
-                    // Viewer count badge
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.remove_red_eye,
-                          size: 12,
-                          color: Colors.white70,
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          '${live['viewerCount']} viewers',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 4),
-
-                    // Title with ellipsis
-                    Text(
-                      live['title'],
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-
-                    SizedBox(height: 8),
-
-                    // Action button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 32,
-                      child: ElevatedButton(
-                        onPressed: isPrivate && isSoldOut && !hasJoined ? null : () {
-                          // Join or continue watching broadcast
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(hasJoined
-                                  ? 'Continuing ${live['name']}\'s broadcast'
-                                  : 'Joining ${live['name']}\'s broadcast'),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: hasJoined ? Colors.green : AppColors.primary,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: Colors.grey,
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          hasJoined
-                              ? 'Watching'
-                              : isPrivate && isSoldOut
-                              ? 'Full'
-                              : isPrivate
-                              ? 'Join Private'
-                              : 'Join',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // "PRIVATE" or "SOLD OUT" overlay
-          if (isPrivate && !hasJoined)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black.withOpacity(0.7),
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.lock,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        isSoldOut ? 'ROOM FULL' : 'PRIVATE',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-          // "JOINED" indicator
-          if (hasJoined)
-            Positioned(
-              top: 10,
-              right: 10,
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.green,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 10,
-                      color: Colors.white,
-                    ),
-                    SizedBox(width: 2),
-                    Text(
-                      'JOINED',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 9,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
     );
   }
 
@@ -1454,7 +955,7 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
 
               // Premium lock icon
               if (isBlurred)
-                const Center( //i have added const here!!
+                const Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -1713,7 +1214,7 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
                       ? 'See who likes you and unlock all premium features!'
                       : _tabController.index == 1
                       ? 'See who visited your profile and unlock all premium features!'
-                      : 'Join exclusive private broadcasts and unlock all premium features!',
+                      : 'Join exclusive private calls and unlock all premium features!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
