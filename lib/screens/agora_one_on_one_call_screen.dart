@@ -6,10 +6,12 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import '../models/user_model.dart' as app_models;
 import '../services/agora_call_service.dart';
 import '../widgets/components/letter_avatar.dart';
+import '../widgets/permission_handler_dialog.dart';
 
 enum CallState {
   idle,
@@ -65,7 +67,23 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
   void initState() {
     super.initState();
     _initializeAnimations();
-    _initializeAgora();
+    _checkPermissionsAndInitialize();
+    // Request permissions on first launch to make them appear in iOS settings
+    _ensurePermissionsInSettings();
+  }
+
+  Future<void> _ensurePermissionsInSettings() async {
+    // Check if this is the first time requesting permissions
+    final cameraStatus = await Permission.camera.status;
+    final micStatus = await Permission.microphone.status;
+
+    // If permissions have never been requested, they won't appear in iOS settings
+    if (cameraStatus == PermissionStatus.denied && micStatus == PermissionStatus.denied) {
+      // Just check status to trigger iOS to add them to settings
+      // This won't show any dialog, just registers the permissions
+      await Permission.camera.status;
+      await Permission.microphone.status;
+    }
   }
 
   void _initializeAnimations() {
@@ -98,6 +116,19 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     _pulseController.repeat(reverse: true);
   }
 
+  Future<void> _checkPermissionsAndInitialize() async {
+    // Check if permissions are already granted
+    final cameraStatus = await Permission.camera.status;
+    final micStatus = await Permission.microphone.status;
+
+    if (cameraStatus == PermissionStatus.granted &&
+        micStatus == PermissionStatus.granted) {
+      // Permissions granted, initialize Agora
+      await _initializeAgora();
+    }
+    // Otherwise, we'll request permissions when user taps Start Call
+  }
+
   Future<void> _initializeAgora() async {
     // Set up Agora callbacks
     _agoraService.onUserJoined = (uid) {
@@ -126,9 +157,8 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     // Initialize Agora engine
     bool initialized = await _agoraService.initialize();
     if (!initialized) {
-      setState(() {
-        _callState = CallState.error;
-      });
+      print('Failed to initialize Agora');
+      // Don't set error state here, as it might be due to permissions
     }
   }
 
@@ -147,7 +177,36 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     super.dispose();
   }
 
-  void _startSearching() {
+  void _startSearching() async {
+    // Check permissions first
+    bool hasPermissions = await PermissionHandlerDialog.checkAndRequestPermissions(context);
+    if (!hasPermissions) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Camera and microphone permissions are required for video calls'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // Initialize Agora if not already initialized
+    if (!_agoraService.isInitialized) {
+      bool initialized = await _agoraService.initialize();
+      if (!initialized) {
+        setState(() {
+          _callState = CallState.error;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to initialize video call service'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+    }
+
     setState(() {
       _callState = CallState.searching;
       _matchedUser = null;
@@ -413,7 +472,70 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
               fontSize: 16,
             ),
           ),
-          const SizedBox(height: 60),
+          const SizedBox(height: 20),
+          // Permission status indicators
+          FutureBuilder<Map<Permission, PermissionStatus>>(
+            future: Future.wait([
+              Permission.camera.status,
+              Permission.microphone.status,
+            ]).then((statuses) => {
+              Permission.camera: statuses[0],
+              Permission.microphone: statuses[1],
+            }),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                final statuses = snapshot.data!;
+                final cameraGranted = statuses[Permission.camera] == PermissionStatus.granted;
+                final micGranted = statuses[Permission.microphone] == PermissionStatus.granted;
+
+                if (!cameraGranted || !micGranted) {
+                  return Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.symmetric(horizontal: 40),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.red.withOpacity(0.5)),
+                        ),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.red,
+                              size: 32,
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Permissions Required',
+                              style: TextStyle(
+                                color: Colors.red,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Please grant camera and microphone permissions to start video calls',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  );
+                }
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          const SizedBox(height: 20),
           // Start button
           GestureDetector(
             onTap: _startSearching,
