@@ -14,9 +14,12 @@ class AgoraCallService {
   factory AgoraCallService() => _instance;
   AgoraCallService._internal();
 
-  // Agora Configuration - Replace with your actual credentials
+  // Agora Configuration
   static const String appId = '1abf8e98afd04b01a8637ddc4bfbf3d1';
-  static const String tempToken = ''; // Use token server in production
+
+  // IMPORTANT: For testing without a token server, set this to null
+  // In production, always use proper token generation
+  static const String? tempToken = null; // Set to null to join without token
 
   late RtcEngine _engine;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -91,6 +94,10 @@ class AgoraCallService {
             print('Error: $err - $msg');
             onError?.call(err, msg);
           },
+          onTokenPrivilegeWillExpire: (RtcConnection connection, String token) {
+            print('Token will expire soon, need to renew');
+            // In production, generate a new token here
+          },
         ),
       );
 
@@ -125,8 +132,27 @@ class AgoraCallService {
     try {
       _currentChannel = channelName;
 
+      // Try to get a token from Firebase Functions
+      String? finalToken = token;
+
+      // If no token provided, try to generate one
+      if (finalToken == null && tempToken == null) {
+        try {
+          finalToken = await AgoraTokenService.generateToken(channelName, 0);
+          print('Generated token for channel: $channelName');
+        } catch (e) {
+          print('Failed to generate token: $e');
+          // For testing, we can join without a token if your Agora project allows it
+          print('Attempting to join without token (testing mode)');
+        }
+      } else if (tempToken != null) {
+        finalToken = tempToken;
+      }
+
+      print('Joining channel: $channelName with token: ${finalToken != null ? "provided" : "none"}');
+
       await _engine.joinChannel(
-        token: token ?? tempToken,
+        token: finalToken ?? '', // Empty string for no token
         channelId: channelName,
         uid: 0,
         options: const ChannelMediaOptions(
@@ -134,12 +160,14 @@ class AgoraCallService {
           publishMicrophoneTrack: true,
           autoSubscribeVideo: true,
           autoSubscribeAudio: true,
+          clientRoleType: ClientRoleType.clientRoleBroadcaster,
         ),
       );
 
       return true;
     } catch (e) {
       print('Failed to join channel: $e');
+      print('Error details: ${e.toString()}');
       return false;
     }
   }
@@ -356,20 +384,27 @@ class CallQueueManager {
   }
 }
 
-// Token generation service (implement server-side)
+// Token generation service
 class AgoraTokenService {
   // In production, call your server to generate tokens
   static Future<String> generateToken(String channelName, int uid) async {
     try {
+      print('Calling Firebase Function to generate Agora token...');
       final callable = FirebaseFunctions.instance.httpsCallable('generateAgoraToken');
       final result = await callable.call({
         'channelName': channelName,
         'uid': uid,
       });
-      return result.data['token'];
+
+      if (result.data != null && result.data['token'] != null) {
+        print('Successfully generated token');
+        return result.data['token'];
+      } else {
+        throw Exception('No token returned from function');
+      }
     } catch (e) {
       print('Error generating token: $e');
-      return '';
+      throw e;
     }
   }
 }
