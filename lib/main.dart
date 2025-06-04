@@ -15,6 +15,7 @@ import 'package:new_tinder_clone/screens/privacy_safety_screen.dart';
 import 'package:new_tinder_clone/screens/splash_screen.dart';
 import 'package:new_tinder_clone/screens/terms_of_service_screen.dart';
 import 'package:new_tinder_clone/screens/theme_settings_screen.dart';
+import 'package:new_tinder_clone/screens/video_call_screen.dart';
 import 'package:new_tinder_clone/widgets/FCMTokenFixer.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -244,6 +245,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const EnhancedHomeScreen(),
     const ExploreScreen(),
+    const VideoCallScreen(),
     const LikesScreen(),
     const MatchesScreen(),
     const StyleProfileScreen(),
@@ -412,6 +414,7 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+// Updated _handleNotificationTap method to account for the new tab indexes
   void _handleNotificationTap(RemoteMessage message) {
     try {
       print('Handling notification tap:');
@@ -427,10 +430,10 @@ class _MainScreenState extends State<MainScreen> {
       switch (type) {
         case 'match':
           setState(() {
-            _currentIndex = 3; // Switch to Matches tab
+            _currentIndex = 4; // Updated index for Matches tab
           });
           _pageController.animateToPage(
-            3,
+            4,
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
           );
@@ -450,19 +453,19 @@ class _MainScreenState extends State<MainScreen> {
 
             // If user not found in matches, just go to matches tab
             setState(() {
-              _currentIndex = 3; // Switch to Matches tab
+              _currentIndex = 4; // Updated index for Matches tab
             });
             _pageController.animateToPage(
-              3,
+              4,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );
           } else {
             setState(() {
-              _currentIndex = 3; // Switch to Matches tab
+              _currentIndex = 4; // Updated index for Matches tab
             });
             _pageController.animateToPage(
-              3,
+              4,
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
             );
@@ -473,7 +476,18 @@ class _MainScreenState extends State<MainScreen> {
         case 'super_like':
         case 'profile_view':
           setState(() {
-            _currentIndex = 2; // Switch to Likes tab
+            _currentIndex = 3; // Updated index for Likes tab
+          });
+          _pageController.animateToPage(
+            3,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeInOut,
+          );
+          break;
+
+        case 'video_call':  // NEW: Handle video call notifications
+          setState(() {
+            _currentIndex = 2; // Index for Video Call tab
           });
           _pageController.animateToPage(
             2,
@@ -497,7 +511,6 @@ class _MainScreenState extends State<MainScreen> {
       print('Error handling notification tap: $e');
     }
   }
-
   Future<void> _saveTokenToFirestore(String token) async {
     try {
       final userId = FirebaseAuth.instance.currentUser?.uid;
@@ -710,13 +723,37 @@ class _MainScreenState extends State<MainScreen> {
               ),
               label: '',
             ),
-            // Likes tab with enhanced icon
+            // Video Call tab with enhanced icon
             BottomNavigationBarItem(
               icon: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: _currentIndex == 2
+                      ? LinearGradient(
+                    colors: [
+                      Colors.green.withOpacity(0.2),
+                      Colors.teal.withOpacity(0.2),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                      : null,
+                ),
+                child: Icon(
+                  Icons.video_call_rounded,
+                  size: _currentIndex == 2 ? 32 : 28,
+                ),
+              ),
+              label: '',
+            ),
+            // Likes tab with enhanced icon
+            BottomNavigationBarItem(
+              icon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: _currentIndex == 3
                       ? LinearGradient(
                     colors: [
                       Colors.pink.withOpacity(0.2),
@@ -731,7 +768,7 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     Icon(
                       Icons.favorite_rounded,
-                      size: _currentIndex == 2 ? 32 : 28,
+                      size: _currentIndex == 3 ? 32 : 28,
                     ),
                     // Optional: Add a notification badge
                     if (false) // Replace with actual condition for new likes
@@ -762,7 +799,7 @@ class _MainScreenState extends State<MainScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: _currentIndex == 3
+                  gradient: _currentIndex == 4
                       ? LinearGradient(
                     colors: [
                       Colors.blue.withOpacity(0.2),
@@ -777,7 +814,7 @@ class _MainScreenState extends State<MainScreen> {
                   children: [
                     Icon(
                       Icons.chat_bubble_rounded,
-                      size: _currentIndex == 3 ? 32 : 28,
+                      size: _currentIndex == 4 ? 32 : 28,
                     ),
                     // Optional: Add a notification badge for unread messages
                     if (false) // Replace with actual condition for unread messages
@@ -808,7 +845,7 @@ class _MainScreenState extends State<MainScreen> {
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: _currentIndex == 4
+                  gradient: _currentIndex == 5
                       ? LinearGradient(
                     colors: [
                       Colors.orange.withOpacity(0.2),
@@ -821,7 +858,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 child: Icon(
                   Icons.person_rounded,
-                  size: _currentIndex == 4 ? 32 : 28,
+                  size: _currentIndex == 5 ? 32 : 28,
                 ),
               ),
               label: '',
@@ -829,10 +866,9 @@ class _MainScreenState extends State<MainScreen> {
           ],
         ),
       ),
-
     );
-
   }
+
 
 }
 

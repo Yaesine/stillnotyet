@@ -38,7 +38,7 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
   void initState() {
     super.initState();
     // Update tab controller to have 3 tabs instead of 2
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(() {
       // This will force a rebuild when the tab changes
       if (_tabController.indexIsChanging) {
@@ -138,7 +138,7 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
                       _buildVisitorsTab(allVisitors),
 
                       // New One-on-One Call Tab
-                      const AgoraOneOnOneCallScreen(),
+                      //const AgoraOneOnOneCallScreen(),
                     ],
                   );
                 },

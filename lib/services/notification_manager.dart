@@ -191,6 +191,73 @@ class NotificationManager {
       navigatorKey.currentState?.pushNamedAndRemoveUntil('/main', (route) => false);
     }
   }
+
+  // Add this method to the NotificationManager class in lib/services/notification_manager.dart
+
+// Send video call notification
+  Future<void> sendVideoCallNotification(String recipientId, String callerName) async {
+    try {
+      print('Preparing video call notification for $recipientId from $callerName');
+
+      // Get the FCM token for the recipient
+      String? fcmToken = await _getFcmTokenForUser(recipientId);
+
+      // Create a unique ID to prevent duplicates
+      final notificationId = 'video_call_${DateTime.now().millisecondsSinceEpoch}_${recipientId}';
+
+      // Get recipient platform
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(recipientId).get();
+      Map<String, dynamic>? userData = userDoc.data() as Map<String, dynamic>?;
+      String platform = userData?['platform'] ?? 'ios';
+
+      if (fcmToken == null || fcmToken.isEmpty) {
+        print('❌ Cannot send video call notification: FCM token not found for $recipientId');
+
+        // Create notification without token - will be processed later
+        await _firestore.collection('notifications').doc(notificationId).set({
+          'type': 'video_call',
+          'title': 'Marifecto',
+          'body': '$callerName is calling you! 📱',
+          'recipientId': recipientId,
+          'data': {
+            'type': 'video_call',
+            'callerId': FirebaseAuth.instance.currentUser?.uid,
+            'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          },
+          'timestamp': FieldValue.serverTimestamp(),
+          'status': 'pending_token',
+          'platform': platform,
+          'priority': 'high',
+          'error': 'No FCM token available',
+        });
+        return;
+      }
+
+      // Create notification document WITH token
+      await _firestore.collection('notifications').doc(notificationId).set({
+        'type': 'video_call',
+        'title': 'Marifecto',
+        'body': '$callerName is calling you! 📱',
+        'recipientId': recipientId,
+        'fcmToken': fcmToken,
+        'data': {
+          'type': 'video_call',
+          'callerId': FirebaseAuth.instance.currentUser?.uid,
+          'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+        },
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'pending',
+        'platform': platform,
+        'priority': 'high',
+        'urgent': true,
+      });
+
+      print('✅ Video call notification created with ID: $notificationId');
+    } catch (e) {
+      print('❌ Error sending video call notification: $e');
+    }
+  }
+
   // Get user data and navigate to chat with better error handling
   Future<void> _getUserDataAndNavigate(String userId) async {
     try {
