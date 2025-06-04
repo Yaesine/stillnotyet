@@ -410,6 +410,19 @@ class FirestoreService {
     }
   }
 
+  Future<void> updateVerifiedStatus(String userId, bool isVerified) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'isVerified': isVerified,
+        'verifiedAt': isVerified ? FieldValue.serverTimestamp() : null,
+      });
+      print('Updated verified status for user $userId: $isVerified');
+    } catch (e) {
+      print('Error updating verified status: $e');
+      throw e;
+    }
+  }
+
   Future<int> getUserCount() async {
     try {
       QuerySnapshot snapshot = await _usersCollection.get();
@@ -909,6 +922,8 @@ class FirestoreService {
         'profileComplete': false,
         'platform': 'ios',
         'appVersion': '1.0.0',
+        'isVerified': false, // Always start with false
+
       };
 
       // Add FCM token if available

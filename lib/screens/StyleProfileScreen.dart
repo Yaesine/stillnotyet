@@ -366,18 +366,19 @@ class _StyleProfileScreenState extends State<StyleProfileScreen> with SingleTick
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.3),
-                            shape: BoxShape.circle,
+                        if (user.isVerified)
+                          Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.3),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.verified,
+                              color: Colors.white,
+                              size: 20,
+                            ),
                           ),
-                          child: const Icon(
-                            Icons.verified,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 4),

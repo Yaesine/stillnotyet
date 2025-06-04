@@ -317,18 +317,20 @@ class _UserProfileDetailState extends State<UserProfileDetail>
               ),
             ),
             const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                shape: BoxShape.circle,
+            // ONLY show verified badge if user.isVerified is true
+            if (widget.user.isVerified)
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.verified,
+                  color: Colors.blue,
+                  size: 24,
+                ),
               ),
-              child: const Icon(
-                Icons.verified,
-                color: Colors.blue,
-                size: 24,
-              ),
-            ),
           ],
         ),
 

@@ -10,6 +10,7 @@ class User {
   final List<String> interests;
   final String location;
   final GeoPoint? geoPoint;
+  final bool isVerified; // Add this field
 
   // Basic profile fields
   final String gender;
@@ -96,6 +97,8 @@ class User {
     this.askAboutPhone = '',
     this.showAge = true,
     this.showDistance = true,
+    this.isVerified = false, // Default to false
+
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -186,6 +189,8 @@ class User {
         askAboutPhone: data['askAboutPhone'] ?? '',
         showAge: data['showAge'] ?? true,
         showDistance: data['showDistance'] ?? true,
+        isVerified: data['isVerified'] ?? false, // Add this
+
       );
     } catch (e) {
       print('Error parsing user data for ${doc.id}: $e');
@@ -197,6 +202,7 @@ class User {
         imageUrls: [],
         interests: [],
         location: 'Unknown',
+
       );
     }
   }
@@ -241,6 +247,8 @@ class User {
       'askAboutPhone': askAboutPhone,
       'showAge': showAge,
       'showDistance': showDistance,
+      'isVerified': isVerified, // Add this
+
     };
   }
 
@@ -283,6 +291,8 @@ class User {
     String? askAboutPhone,
     bool? showAge,
     bool? showDistance,
+    bool? isVerified, // Add this
+
   }) {
     return User(
       id: id ?? this.id,
@@ -323,6 +333,8 @@ class User {
       askAboutPhone: askAboutPhone ?? this.askAboutPhone,
       showAge: showAge ?? this.showAge,
       showDistance: showDistance ?? this.showDistance,
+      isVerified: isVerified ?? this.isVerified, // Add this
+
     );
   }
 

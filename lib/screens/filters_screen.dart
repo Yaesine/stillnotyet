@@ -94,6 +94,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
         );
         _maxDistance = user.distance.toDouble();
         _genderPreference = user.lookingFor.isEmpty ? 'Everyone' : user.lookingFor;
+        _wantVerifiedBadge = user.isVerified; // Load from user model
+
       });
 
       try {
@@ -110,7 +112,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
             _showVerifiedOnly = userData['showVerifiedOnly'] ?? false;
             _advancedMatchingEnabled = userData['advancedMatchingEnabled'] ?? false;
             _activityLevel = (userData['activityLevel'] ?? 3).toDouble();
-            _wantVerifiedBadge = userData['wantVerifiedBadge'] ?? false;
+            _wantVerifiedBadge = userData['isVerified'] ?? false;
+
 
             if (userData['prioritizedInterests'] != null) {
               _selectedInterests = List<String>.from(userData['prioritizedInterests']);
@@ -171,6 +174,8 @@ class _FiltersScreenState extends State<FiltersScreen> {
           ageRangeStart: _ageRange.start.round(),
           ageRangeEnd: _ageRange.end.round(),
           lookingFor: _genderPreference == 'Everyone' ? '' : _genderPreference,
+          isVerified: _wantVerifiedBadge, // Add this to update the user model
+
         );
 
         await userProvider.updateUserProfile(updatedUser);
@@ -183,6 +188,7 @@ class _FiltersScreenState extends State<FiltersScreen> {
           'advancedMatchingEnabled': _advancedMatchingEnabled,
           'prioritizedInterests': _selectedInterests,
           'wantVerifiedBadge': _wantVerifiedBadge, // NEW
+          'isVerified': _wantVerifiedBadge, // Ensure this is saved
 
           // Professional filters
           'filterByProfessional': _filterByProfessional,
@@ -587,7 +593,9 @@ class _FiltersScreenState extends State<FiltersScreen> {
                     (value) => setState(() => _wantVerifiedBadge = value),
                 isDarkMode,
                 themeColor,
-                subtitle: 'Show a blue verified badge next to your name',
+                subtitle: _wantVerifiedBadge
+                    ? 'Your profile shows a verified badge'
+                    : 'Show a blue verified badge next to your name',
                 icon: Icons.verified,
                 iconColor: Colors.blue,
                 isPremium: true,
@@ -1314,9 +1322,13 @@ class _FiltersScreenState extends State<FiltersScreen> {
         ),
         Switch(
           value: value,
-          onChanged: isPremium ? (newValue) {
+          onChanged: isPremium
+              ? (newValue) {
+            // For premium features, always show the popup
+            // The switch won't change because we're not calling onChanged
             _showPremiumPopup();
-          } : onChanged,
+          }
+              : onChanged, // For non-premium features, work normally
           activeColor: isDarkMode ? Colors.white : themeColor,
           activeTrackColor: isDarkMode
               ? themeColor

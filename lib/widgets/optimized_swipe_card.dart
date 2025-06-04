@@ -566,20 +566,21 @@ class _OptimizedSwipeCardState extends State<OptimizedSwipeCard> with SingleTick
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Verified badge
-            Container(
-              margin: const EdgeInsets.only(left: 8),
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.3),
-                shape: BoxShape.circle,
+            // Verified badge - ONLY show if user.isVerified is true
+            if (widget.user.isVerified)
+              Container(
+                margin: const EdgeInsets.only(left: 8),
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.3),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.verified,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
-              child: const Icon(
-                Icons.verified,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
 
             // Common interests badge if any exist
             if (commonInterestsCount > 0)
