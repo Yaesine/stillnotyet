@@ -1,7 +1,7 @@
-// lib/screens/video_call_screen.dart
+// lib/screens/video_call_screen.dart - Updated to use enhanced version
 import 'package:flutter/material.dart';
-import '../screens/agora_one_on_one_call_screen.dart';
 import '../theme/app_theme.dart';
+import 'agora_one_on_one_call_screen.dart';
 
 class VideoCallScreen extends StatelessWidget {
   const VideoCallScreen({Key? key}) : super(key: key);
@@ -23,7 +23,7 @@ class VideoCallScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: true,
       ),
-      body: const AgoraOneOnOneCallScreen(),
+      body: const AgoraOneOnOneCallScreen(), // Use the enhanced version
     );
   }
 }

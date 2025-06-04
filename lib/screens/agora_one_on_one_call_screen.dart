@@ -1,4 +1,4 @@
-// lib/screens/agora_one_on_one_call_screen.dart
+// lib/screens/agora_one_on_one_call_screen.dart - Complete implementation with fake video integration
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -11,14 +11,17 @@ import 'package:permission_handler/permission_handler.dart';
 import '../theme/app_theme.dart';
 import '../models/user_model.dart' as app_models;
 import '../services/agora_call_service.dart';
+import '../services/fake_video_call_service.dart';
 import '../widgets/components/letter_avatar.dart';
 import '../widgets/permission_handler_dialog.dart';
+import '../widgets/fake_video_player.dart';
 
 enum CallState {
   idle,
   searching,
   connecting,
   connected,
+  fakeCall,
   disconnected,
   error
 }
@@ -37,20 +40,25 @@ class AgoraOneOnOneCallScreen extends StatefulWidget {
 
 class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     with TickerProviderStateMixin {
+
   // Services
   final AgoraCallService _agoraService = AgoraCallService();
   final CallQueueManager _queueManager = CallQueueManager();
+  final FakeVideoCallService _fakeVideoService = FakeVideoCallService();
 
-  // State
+  // State management
   CallState _callState = CallState.idle;
   app_models.User? _matchedUser;
   String? _currentRoomId;
+  FakeCallSession? _fakeCallSession;
   Timer? _searchTimer;
   Timer? _matchingTimeout;
+  Timer? _fakeCallTimer;
   int _callDuration = 0;
   Timer? _callTimer;
   bool _showControls = true;
   Timer? _hideControlsTimer;
+  bool _isFakeCall = false;
 
   // Animation controllers
   late AnimationController _pulseController;
@@ -58,7 +66,7 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
   late Animation<double> _pulseAnimation;
   late Animation<Offset> _slideAnimation;
 
-  // Search messages
+  // Search configuration
   final List<String> _searchingMessages = [
     'Finding someone interesting...',
     'Connecting you with new people...',
@@ -76,7 +84,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     _checkPermissionsAndInitialize();
     _ensurePermissionsInSettings();
 
-    // Set fullscreen mode if requested
     if (widget.isFullScreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
@@ -84,30 +91,31 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
 
   @override
   void dispose() {
-    // Restore system UI when leaving
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
+    // Dispose animation controllers
     _pulseController.dispose();
     _slideController.dispose();
+
+    // Cancel all timers
     _searchTimer?.cancel();
     _callTimer?.cancel();
     _messageTimer?.cancel();
     _hideControlsTimer?.cancel();
     _matchingTimeout?.cancel();
+    _fakeCallTimer?.cancel();
+
+    // Cleanup services
     _queueManager.stopListening();
     _agoraService.removeFromQueue();
     _agoraService.dispose();
-    super.dispose();
-  }
 
-  Future<void> _ensurePermissionsInSettings() async {
-    final cameraStatus = await Permission.camera.status;
-    final micStatus = await Permission.microphone.status;
-
-    if (cameraStatus == PermissionStatus.denied && micStatus == PermissionStatus.denied) {
-      await Permission.camera.status;
-      await Permission.microphone.status;
+    // End fake call session if active
+    if (_fakeCallSession != null) {
+      _fakeVideoService.endFakeCallSession(_fakeCallSession!.sessionId);
     }
+
+    super.dispose();
   }
 
   void _initializeAnimations() {
@@ -150,11 +158,22 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     }
   }
 
+  Future<void> _ensurePermissionsInSettings() async {
+    final cameraStatus = await Permission.camera.status;
+    final micStatus = await Permission.microphone.status;
+
+    if (cameraStatus == PermissionStatus.denied && micStatus == PermissionStatus.denied) {
+      await Permission.camera.status;
+      await Permission.microphone.status;
+    }
+  }
+
   Future<void> _initializeAgora() async {
     _agoraService.onUserJoined = (uid) {
       print('Remote user joined: $uid');
       setState(() {
         _callState = CallState.connected;
+        _isFakeCall = false;
       });
       _startCall();
     };
@@ -192,26 +211,11 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       return;
     }
 
-    if (!_agoraService.isInitialized) {
-      bool initialized = await _agoraService.initialize();
-      if (!initialized) {
-        setState(() {
-          _callState = CallState.error;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to initialize video call service'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-    }
-
     setState(() {
       _callState = CallState.searching;
       _matchedUser = null;
       _callDuration = 0;
+      _isFakeCall = false;
     });
 
     _messageTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
@@ -222,48 +226,107 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       }
     });
 
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUserId != null) {
-      _queueManager.startListening(currentUserId, (matchedUserId) async {
-        await _handleMatch(matchedUserId);
-      });
-    }
+    // Check if we should use fake video
+    final shouldUseFake = await _fakeVideoService.shouldUseFakeVideo();
 
-    _findMatch();
+    if (shouldUseFake) {
+      print('No real users available, starting fake video call');
+      _startFakeVideoCall();
+    } else {
+      _findRealMatch();
+    }
 
     _matchingTimeout = Timer(const Duration(seconds: 30), () {
       if (_callState == CallState.searching) {
-        setState(() {
-          _callState = CallState.error;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No matches found. Try again later.'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        print('Real user search timeout, falling back to fake video');
+        _startFakeVideoCall();
       }
     });
   }
 
-  Future<void> _findMatch() async {
+  Future<void> _startFakeVideoCall() async {
     try {
-      final matchedUser = await _agoraService.findRandomMatch();
+      _matchingTimeout?.cancel();
+      _messageTimer?.cancel();
 
-      if (matchedUser != null && mounted) {
-        await _handleMatch(matchedUser.id);
-      }
-    } catch (e) {
-      print('Error finding match: $e');
-      if (mounted) {
+      setState(() {
+        _callState = CallState.connecting;
+      });
+
+      await Future.delayed(const Duration(seconds: 2));
+
+      final session = await _fakeVideoService.startFakeVideoCall();
+      if (session == null) {
         setState(() {
           _callState = CallState.error;
         });
+        return;
       }
+
+      final fakeUser = app_models.User(
+        id: session.sessionId,
+        name: session.fakeVideo.user.name,
+        age: session.fakeVideo.user.age,
+        bio: 'Love ${session.fakeVideo.user.interests.join(", ")}',
+        imageUrls: [session.fakeVideo.thumbnailUrl],
+        interests: session.fakeVideo.user.interests,
+        location: session.fakeVideo.user.location,
+      );
+
+      setState(() {
+        _fakeCallSession = session;
+        _matchedUser = fakeUser;
+        _callState = CallState.fakeCall;
+        _isFakeCall = true;
+      });
+
+      _slideController.forward();
+      _startCall();
+
+      _fakeCallTimer = Timer(session.fakeVideo.duration, () {
+        if (_callState == CallState.fakeCall) {
+          _endCall();
+        }
+      });
+
+    } catch (e) {
+      print('Error starting fake video call: $e');
+      setState(() {
+        _callState = CallState.error;
+      });
     }
   }
 
-  Future<void> _handleMatch(String matchedUserId) async {
+  Future<void> _findRealMatch() async {
+    if (!_agoraService.isInitialized) {
+      bool initialized = await _agoraService.initialize();
+      if (!initialized) {
+        setState(() {
+          _callState = CallState.error;
+        });
+        return;
+      }
+    }
+
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId != null) {
+      _queueManager.startListening(currentUserId, (matchedUserId) async {
+        await _handleRealMatch(matchedUserId);
+      });
+    }
+
+    try {
+      final matchedUser = await _agoraService.findRandomMatch();
+      if (matchedUser != null && mounted) {
+        await _handleRealMatch(matchedUser.id);
+      }
+    } catch (e) {
+      print('Error finding real match: $e');
+      _startFakeVideoCall();
+    }
+  }
+
+  Future<void> _handleRealMatch(String matchedUserId) async {
     try {
       _matchingTimeout?.cancel();
 
@@ -287,13 +350,13 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       }
 
       _currentRoomId = roomId;
-
       bool joined = await _agoraService.joinChannel(roomId);
 
       if (joined && mounted) {
         setState(() {
           _matchedUser = matchedUser;
           _callState = CallState.connected;
+          _isFakeCall = false;
         });
 
         _slideController.forward();
@@ -304,7 +367,7 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
         });
       }
     } catch (e) {
-      print('Error handling match: $e');
+      print('Error handling real match: $e');
       setState(() {
         _callState = CallState.error;
       });
@@ -340,14 +403,20 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
     _messageTimer?.cancel();
     _hideControlsTimer?.cancel();
     _matchingTimeout?.cancel();
+    _fakeCallTimer?.cancel();
 
-    await _agoraService.leaveChannel();
-
-    if (_currentRoomId != null) {
-      await _agoraService.endCallRoom(_currentRoomId!);
+    if (_fakeCallSession != null) {
+      await _fakeVideoService.endFakeCallSession(_fakeCallSession!.sessionId);
+      _fakeCallSession = null;
     }
 
-    await _agoraService.removeFromQueue();
+    if (!_isFakeCall) {
+      await _agoraService.leaveChannel();
+      if (_currentRoomId != null) {
+        await _agoraService.endCallRoom(_currentRoomId!);
+      }
+      await _agoraService.removeFromQueue();
+    }
 
     setState(() {
       _callState = CallState.idle;
@@ -355,6 +424,7 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       _callDuration = 0;
       _showControls = true;
       _currentRoomId = null;
+      _isFakeCall = false;
     });
   }
 
@@ -401,12 +471,10 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // For fullscreen mode, use a different scaffold
     if (widget.isFullScreen) {
       return WillPopScope(
         onWillPop: () async {
-          if (_callState == CallState.connected) {
-            // Show confirmation dialog before leaving during a call
+          if (_callState == CallState.connected || _callState == CallState.fakeCall) {
             final shouldLeave = await showDialog<bool>(
               context: context,
               builder: (context) => AlertDialog(
@@ -439,7 +507,7 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
           body: Stack(
             children: [
               _buildMainContent(),
-              if (_callState == CallState.connected && _showControls)
+              if ((_callState == CallState.connected || _callState == CallState.fakeCall) && _showControls)
                 _buildCallControls(),
               _buildTopBar(),
             ],
@@ -448,13 +516,12 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       );
     }
 
-    // Regular mode with tab bar
     return Scaffold(
       backgroundColor: isDarkMode ? Colors.black : Colors.grey.shade900,
       body: Stack(
         children: [
           _buildMainContent(),
-          if (_callState == CallState.connected && _showControls)
+          if ((_callState == CallState.connected || _callState == CallState.fakeCall) && _showControls)
             _buildCallControls(),
           _buildTopBar(),
           if (!widget.isFullScreen && _callState != CallState.idle)
@@ -474,11 +541,31 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
         return _buildConnectingState();
       case CallState.connected:
         return _buildConnectedState();
+      case CallState.fakeCall:
+        return _buildFakeCallState();
       case CallState.error:
         return _buildErrorState();
       case CallState.disconnected:
         return _buildDisconnectedState();
     }
+  }
+
+  Widget _buildFakeCallState() {
+    if (_fakeCallSession == null) return Container();
+
+    return FakeVideoPlayer(
+      session: _fakeCallSession!,
+      onCallEnd: _endCall,
+      showControls: _showControls,
+      onControlsToggle: () {
+        setState(() {
+          _showControls = !_showControls;
+        });
+        if (_showControls) {
+          _resetHideControlsTimer();
+        }
+      },
+    );
   }
 
   Widget _buildIdleState() {
@@ -1063,7 +1150,7 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
                   color: Colors.white,
                 ),
                 onPressed: () async {
-                  if (_callState == CallState.connected) {
+                  if (_callState == CallState.connected || _callState == CallState.fakeCall) {
                     final shouldLeave = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
@@ -1093,11 +1180,11 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
                 },
               ),
 
-            if (_callState == CallState.connected)
+            if (_callState == CallState.connected || _callState == CallState.fakeCall)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.red,
+                  color: _isFakeCall ? Colors.orange : Colors.red,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
@@ -1193,21 +1280,21 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
             _buildControlButton(
-              icon: _agoraService.isMuted ? Icons.mic_off : Icons.mic,
-              onPressed: () async {
+              icon: _isFakeCall ? Icons.mic_off : (_agoraService.isMuted ? Icons.mic_off : Icons.mic),
+              onPressed: _isFakeCall ? () {} : () async {
                 await _agoraService.toggleMute();
                 setState(() {});
               },
-              isActive: !_agoraService.isMuted,
+              isActive: _isFakeCall ? false : !_agoraService.isMuted,
             ),
 
             _buildControlButton(
-              icon: _agoraService.isVideoDisabled ? Icons.videocam_off : Icons.videocam,
-              onPressed: () async {
+              icon: _isFakeCall ? Icons.videocam_off : (_agoraService.isVideoDisabled ? Icons.videocam_off : Icons.videocam),
+              onPressed: _isFakeCall ? () {} : () async {
                 await _agoraService.toggleVideo();
                 setState(() {});
               },
-              isActive: !_agoraService.isVideoDisabled,
+              isActive: _isFakeCall ? false : !_agoraService.isVideoDisabled,
             ),
 
             _buildControlButton(
@@ -1224,10 +1311,10 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
 
             _buildControlButton(
               icon: Icons.cameraswitch,
-              onPressed: () async {
+              onPressed: _isFakeCall ? () {} : () async {
                 await _agoraService.switchCamera();
               },
-              isActive: true,
+              isActive: !_isFakeCall,
             ),
 
             _buildControlButton(

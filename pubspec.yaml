@@ -28,6 +28,7 @@ dependencies:
   # Authentication dependencies
   sign_in_with_apple: ^5.0.0
   crypto: ^3.0.3
+  video_player: ^2.8.1
 
   # Other dependencies from your original file
   image_picker: ^0.8.9
