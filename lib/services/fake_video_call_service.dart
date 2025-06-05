@@ -14,12 +14,11 @@ class FakeVideoCallService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Random _random = Random();
 
-  // UPDATED: Replace Google Drive URLs with working video URLs
   final List<FakeVideoData> _fakeVideos = [
     FakeVideoData(
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131937/Video_Ready_Enthusiastic_Young_Woman_1_xvqma6.mp4',
       thumbnailUrl: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=500&auto=format&fit=crop&q=60',
-      duration: Duration(minutes: 3),
+      duration: Duration(minutes: 1),
       user: FakeUserData(
         name: 'Emma',
         age: 24,
@@ -28,9 +27,9 @@ class FakeVideoCallService {
       ),
     ),
     FakeVideoData(
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+      videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131931/Video_Generation_Young_Woman_Chat_1_bvphzc.mp4',
       thumbnailUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&auto=format&fit=crop&q=60',
-      duration: Duration(minutes: 4),
+      duration: Duration(minutes: 1),
       user: FakeUserData(
         name: 'Sarah',
         age: 26,
@@ -39,9 +38,9 @@ class FakeVideoCallService {
       ),
     ),
     FakeVideoData(
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131814/Video_Request_Silent_Vlog_1_hqlwnt.mp4',
       thumbnailUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&auto=format&fit=crop&q=60',
-      duration: Duration(minutes: 2, seconds: 30),
+      duration: Duration(minutes: 1, seconds: 30),
       user: FakeUserData(
         name: 'Jessica',
         age: 28,
@@ -49,31 +48,10 @@ class FakeVideoCallService {
         interests: ['Fitness', 'Movies', 'Dancing'],
       ),
     ),
-    FakeVideoData(
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=500&auto=format&fit=crop&q=60',
-      duration: Duration(minutes: 1, seconds: 45),
-      user: FakeUserData(
-        name: 'Mia',
-        age: 25,
-        location: 'Los Angeles',
-        interests: ['Nature', 'Adventure', 'Photography'],
-      ),
-    ),
-    FakeVideoData(
-      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&auto=format&fit=crop&q=60',
-      duration: Duration(minutes: 1, seconds: 10),
-      user: FakeUserData(
-        name: 'Olivia',
-        age: 27,
-        location: 'Miami',
-        interests: ['Beach', 'Sports', 'Music'],
-      ),
-    ),
+
+
   ];
 
-  // Rest of your existing methods remain the same...
 
   FakeVideoData getRandomFakeVideo() {
     return _fakeVideos[_random.nextInt(_fakeVideos.length)];

@@ -242,12 +242,12 @@ class _FakeVideoPlayerState extends State<FakeVideoPlayer>
             ),
 
           // Video controls (optional)
-          if (widget.showControls && _isVideoInitialized && !_hasVideoError)
-            Positioned(
-              bottom: 100,
-              right: 20,
-              child: _buildVideoControls(),
-            ),
+          //    if (widget.showControls && _isVideoInitialized && !_hasVideoError)
+            //     Positioned(
+            //      bottom: 100,
+            //     right: 20,
+            //     child: _buildVideoControls(),
+          //  ),
         ],
       ),
     );
@@ -526,7 +526,7 @@ class _FakeVideoPlayerState extends State<FakeVideoPlayer>
             ),
             SizedBox(height: 24),
             Text(
-              'Loading video...',
+              'Loading...',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,

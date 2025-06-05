@@ -203,6 +203,8 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
 
 // Update your _startSearching() method in AgoraOneOnOneCallScreen
 
+// Replace the _startSearching method in AgoraOneOnOneCallScreen with this fixed version:
+
   void _startSearching() async {
     bool hasPermissions = await PermissionHandlerDialog.checkAndRequestPermissions(context);
     if (!hasPermissions) {
@@ -235,12 +237,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
         });
       });
 
-      // Start the search process in the fullscreen version
-      // We'll need to delay this slightly to ensure the fullscreen version is ready
-      Future.delayed(const Duration(milliseconds: 500), () {
-        // The fullscreen version will handle the actual search
-      });
-
       return; // Exit here, the fullscreen version will handle the rest
     }
 
@@ -260,24 +256,97 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       }
     });
 
-    // Check if we should use fake video
-    final shouldUseFake = await _fakeVideoService.shouldUseFakeVideo();
+    // FIXED: Always try to find real users first
+    print('🔍 Starting search for real users...');
 
-    if (shouldUseFake) {
-      print('No real users available, starting fake video call');
-      _startFakeVideoCall();
-    } else {
-      _findRealMatch();
+    // Start finding real match
+    bool foundRealUser = await _findRealMatchWithTimeout();
+
+    // If no real user found and still searching, start fake video
+    if (!foundRealUser && _callState == CallState.searching && mounted) {
+      print('📹 No real users found, starting fake video call...');
+      await _startFakeVideoCall();
     }
-
-    _matchingTimeout = Timer(const Duration(seconds: 30), () {
-      if (_callState == CallState.searching) {
-        print('Real user search timeout, falling back to fake video');
-        _startFakeVideoCall();
-      }
-    });
   }
 
+// Add this new method to handle the real user search with proper timeout:
+  // Replace the _findRealMatchWithTimeout method in AgoraOneOnOneCallScreen:
+
+  Future<bool> _findRealMatchWithTimeout() async {
+    if (!_agoraService.isInitialized) {
+      bool initialized = await _agoraService.initialize();
+      if (!initialized) {
+        setState(() {
+          _callState = CallState.error;
+        });
+        return false;
+      }
+    }
+
+    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
+    if (currentUserId == null) return false;
+
+    // Start listening for matches in the queue
+    _queueManager.startListening(currentUserId, (matchedUserId) async {
+      if (_callState == CallState.searching) {
+        await _handleRealMatch(matchedUserId);
+      }
+    });
+
+    try {
+      // Add current user to the queue
+      print('📝 Adding user to call queue...');
+      await FirebaseFirestore.instance.collection('call_queue').doc(currentUserId).set({
+        'userId': currentUserId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'waiting',
+      });
+
+      // REDUCED: Only search for 10 seconds (was 20)
+      final timeout = DateTime.now().add(const Duration(seconds: 10));
+
+      // REDUCED: Only make 3 attempts
+      int attempts = 0;
+      const maxAttempts = 3;
+
+      while (DateTime.now().isBefore(timeout) &&
+          _callState == CallState.searching &&
+          attempts < maxAttempts) {
+
+        attempts++;
+        print('🔄 Search attempt $attempts of $maxAttempts for real users...');
+
+        final matchedUser = await _agoraService.findRandomMatch();
+        if (matchedUser != null && mounted && _callState == CallState.searching) {
+          print('✅ Found real user match!');
+          await _handleRealMatch(matchedUser.id);
+          return true; // Found a real user
+        }
+
+        // Only wait if we haven't reached max attempts
+        if (attempts < maxAttempts) {
+          await Future.delayed(const Duration(seconds: 3));
+        }
+      }
+
+      print('⏱️ Completed $attempts attempts - no real users found');
+
+      // Remove from queue if still searching
+      if (_callState == CallState.searching) {
+        await FirebaseFirestore.instance.collection('call_queue').doc(currentUserId).delete();
+      }
+
+      return false; // No real user found
+
+    } catch (e) {
+      print('❌ Error finding real match: $e');
+      // Clean up on error
+      try {
+        await FirebaseFirestore.instance.collection('call_queue').doc(currentUserId).delete();
+      } catch (_) {}
+      return false;
+    }
+  }
 
   Future<void> _startFakeVideoCall() async {
     try {
@@ -288,11 +357,24 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
         _callState = CallState.connecting;
       });
 
-      // Initialize Agora even for fake calls (for local camera)
+      // IMPORTANT: Initialize Agora for local camera even in fake calls
       if (!_agoraService.isInitialized) {
+        print('📹 Initializing Agora for fake call camera...');
         bool initialized = await _agoraService.initialize();
         if (!initialized) {
-          print('Warning: Agora not initialized for fake call');
+          print('⚠️ Warning: Agora not initialized for fake call camera');
+        }
+      }
+
+      // Join a dummy channel for local camera to work
+      if (_agoraService.isInitialized) {
+        print('📹 Joining dummy channel for camera preview...');
+        String dummyChannel = 'fake_call_${DateTime.now().millisecondsSinceEpoch}';
+        await _agoraService.joinChannel(dummyChannel);
+
+        // Ensure camera is enabled
+        if (_agoraService.isVideoDisabled) {
+          await _agoraService.toggleVideo();
         }
       }
 
@@ -341,7 +423,6 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       });
     }
   }
-  
   Future<void> _findRealMatch() async {
     if (!_agoraService.isInitialized) {
       bool initialized = await _agoraService.initialize();
@@ -355,19 +436,43 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
 
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     if (currentUserId != null) {
+      // Start listening for matches in the queue
       _queueManager.startListening(currentUserId, (matchedUserId) async {
         await _handleRealMatch(matchedUserId);
+      });
+
+      // Add current user to the queue
+      print('📝 Adding user to call queue...');
+      await FirebaseFirestore.instance.collection('call_queue').doc(currentUserId).set({
+        'userId': currentUserId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'status': 'waiting',
       });
     }
 
     try {
-      final matchedUser = await _agoraService.findRandomMatch();
-      if (matchedUser != null && mounted) {
-        await _handleRealMatch(matchedUser.id);
+      // Try multiple times to find a match
+      for (int attempt = 0; attempt < 3; attempt++) {
+        if (_callState != CallState.searching) break;
+
+        print('🔄 Attempt ${attempt + 1} to find real users...');
+
+        final matchedUser = await _agoraService.findRandomMatch();
+        if (matchedUser != null && mounted && _callState == CallState.searching) {
+          print('✅ Found real user match!');
+          await _handleRealMatch(matchedUser.id);
+          return;
+        }
+
+        // Wait a bit before trying again
+        if (attempt < 2) {
+          await Future.delayed(const Duration(seconds: 5));
+        }
       }
+
+      print('❌ No real users found after multiple attempts');
     } catch (e) {
-      print('Error finding real match: $e');
-      _startFakeVideoCall();
+      print('❌ Error finding real match: $e');
     }
   }
 
@@ -455,13 +560,16 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       _fakeCallSession = null;
     }
 
-    if (!_isFakeCall) {
+    // Always leave channel and cleanup Agora, even for fake calls
+    if (_agoraService.isInitialized) {
       await _agoraService.leaveChannel();
-      if (_currentRoomId != null) {
-        await _agoraService.endCallRoom(_currentRoomId!);
-      }
-      await _agoraService.removeFromQueue();
     }
+
+    if (!_isFakeCall && _currentRoomId != null) {
+      await _agoraService.endCallRoom(_currentRoomId!);
+    }
+
+    await _agoraService.removeFromQueue();
 
     setState(() {
       _callState = CallState.idle;
@@ -470,6 +578,8 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
       _showControls = true;
       _currentRoomId = null;
       _isFakeCall = false;
+      _fakeCallCameraEnabled = true;
+      _fakeCallMicEnabled = true;
     });
   }
 
@@ -1413,12 +1523,14 @@ class _AgoraOneOnOneCallScreenState extends State<AgoraOneOnOneCallScreen>
                   ? (_fakeCallCameraEnabled ? Icons.videocam : Icons.videocam_off)
                   : (_agoraService.isVideoDisabled ? Icons.videocam_off : Icons.videocam),
               onPressed: _isFakeCall
-                  ? () {
+                  ? () async {
                 setState(() {
                   _fakeCallCameraEnabled = !_fakeCallCameraEnabled;
                 });
-                // Optionally still control real camera for fake calls
-                _agoraService.toggleVideo();
+                // Actually toggle the real camera for fake calls too
+                if (_agoraService.isInitialized) {
+                  await _agoraService.toggleVideo();
+                }
               }
                   : () async {
                 await _agoraService.toggleVideo();
