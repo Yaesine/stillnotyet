@@ -1,4 +1,6 @@
 // Modified version of lib/screens/enhanced_home_screen.dart with improved super like animation
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' as auth;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
@@ -251,6 +253,10 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
 
   // Add this to your EnhancedHomeScreen class in lib/screens/enhanced_home_screen.dart
 
+// Add these imports at the top of your file:
+// import 'package:firebase_auth/firebase_auth.dart' as auth;
+// import 'package:new_tinder_clone/models/user_model.dart' as app_models;
+
   void _handleRewind() async {
     if (_isActionInProgress) return;
 
@@ -259,12 +265,29 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
     });
 
     try {
-      // First check if user has premium with rewind feature or is admin
-      final userProvider = Provider.of<UserProvider>(context, listen: false);
-      final hasRewindFeature = await userProvider.hasFeature('rewind');
+      // Get current user ID
+      final userId = auth.FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('User not authenticated'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
 
-      if (!hasRewindFeature) {
-        // User doesn't have premium or admin - show premium screen
+      // DIRECT CHECK for admin status in Firestore
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+      final isAdmin = userDoc.data()?['isAdmin'] == true;
+      final isPremium = userDoc.data()?['isPremium'] == true;
+
+      print('User status check - isAdmin: $isAdmin, isPremium: $isPremium');
+
+      // If user is neither admin nor premium, show premium screen
+      if (!isAdmin && !isPremium) {
+        print('User has no premium access - redirecting to premium screen');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Rewind is a premium feature. Upgrade to use it!'),
@@ -285,9 +308,9 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
         return;
       }
 
-      // For premium/admin users, proceed with rewind operation
-      final rewindService = RewindService();
-      final result = await userProvider.rewindLastSwipe();
+      // For admin/premium users, proceed with rewind
+      print('User has premium access (admin: $isAdmin, premium: $isPremium) - proceeding with rewind');
+      final result = await Provider.of<UserProvider>(context, listen: false).rewindLastSwipe();
 
       if (result['success']) {
         // Show success message
@@ -323,6 +346,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
       });
     }
   }
+
   void _handleSwipeLeft(String userId) {
     // Immediately update UI to show next profile
     Provider.of<UserProvider>(context, listen: false).removeProfileLocally(userId);
