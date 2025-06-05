@@ -1,7 +1,8 @@
-// lib/widgets/fake_video_player.dart
+// lib/widgets/fake_video_player.dart - Updated to actually play videos
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../services/fake_video_call_service.dart';
 import '../theme/app_theme.dart';
@@ -28,15 +29,23 @@ class FakeVideoPlayer extends StatefulWidget {
 class _FakeVideoPlayerState extends State<FakeVideoPlayer>
     with TickerProviderStateMixin {
 
-  late AnimationController _videoController;
+  // Video Player
+  VideoPlayerController? _videoController;
+  bool _isVideoInitialized = false;
+  bool _hasVideoError = false;
+  String? _videoErrorMessage;
+  bool _isVideoLoading = true;
+
+  // Animation controllers
   late AnimationController _gestureController;
   late Animation<double> _gestureAnimation;
 
+  // Timers and subscriptions
   Timer? _eventTimer;
   Timer? _textTimer;
   StreamSubscription? _eventSubscription;
 
-  bool _isVideoLoaded = false;
+  // State
   bool _showingGesture = false;
   String _currentText = '';
   bool _showText = false;
@@ -50,16 +59,11 @@ class _FakeVideoPlayerState extends State<FakeVideoPlayer>
     super.initState();
     _initializeAnimations();
     _loadConversationTexts();
-    _startVideoSimulation();
+    _initializeVideo(); // Initialize actual video player
     _startEventSubscription();
   }
 
   void _initializeAnimations() {
-    _videoController = AnimationController(
-      duration: const Duration(seconds: 2),
-      vsync: this,
-    );
-
     _gestureController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -80,19 +84,65 @@ class _FakeVideoPlayerState extends State<FakeVideoPlayer>
     _conversationTexts.addAll(service.getFakeResponses());
   }
 
-  void _startVideoSimulation() {
-    // Simulate video loading
-    Future.delayed(const Duration(milliseconds: 500), () {
+  // NEW: Initialize actual video player
+  Future<void> _initializeVideo() async {
+    try {
+      final videoUrl = widget.session.fakeVideo.videoUrl;
+      print('🎥 Initializing fake video: $videoUrl');
+
+      // Create video controller based on URL type
+      if (videoUrl.startsWith('assets/')) {
+        _videoController = VideoPlayerController.asset(videoUrl);
+      } else {
+        _videoController = VideoPlayerController.network(videoUrl);
+      }
+
+      // Add error listener
+      _videoController!.addListener(() {
+        if (_videoController!.value.hasError) {
+          print('❌ Video player error: ${_videoController!.value.errorDescription}');
+          if (mounted) {
+            setState(() {
+              _hasVideoError = true;
+              _videoErrorMessage = _videoController!.value.errorDescription;
+              _isVideoLoading = false;
+            });
+          }
+        }
+      });
+
+      // Initialize the controller
+      await _videoController!.initialize();
+
       if (mounted) {
         setState(() {
-          _isVideoLoaded = true;
+          _isVideoInitialized = true;
+          _isVideoLoading = false;
+          _hasVideoError = false;
         });
-        _videoController.repeat();
-      }
-    });
 
-    // Start showing conversation texts
-    _startConversationTexts();
+        // Start playing automatically
+        _videoController!.play();
+        _videoController!.setLooping(true);
+
+        print('✅ Fake video initialized and playing');
+
+        // Start conversation texts after video loads
+        _startConversationTexts();
+      }
+    } catch (e) {
+      print('❌ Error initializing fake video: $e');
+      if (mounted) {
+        setState(() {
+          _hasVideoError = true;
+          _videoErrorMessage = e.toString();
+          _isVideoLoading = false;
+        });
+
+        // Still start conversation texts even if video fails
+        _startConversationTexts();
+      }
+    }
   }
 
   void _startConversationTexts() {
@@ -143,8 +193,8 @@ class _FakeVideoPlayerState extends State<FakeVideoPlayer>
 
   @override
   void dispose() {
-    _videoController.dispose();
     _gestureController.dispose();
+    _videoController?.dispose(); // Dispose video controller
     _eventTimer?.cancel();
     _textTimer?.cancel();
     _eventSubscription?.cancel();
@@ -157,7 +207,7 @@ class _FakeVideoPlayerState extends State<FakeVideoPlayer>
       onTap: widget.onControlsToggle,
       child: Stack(
         children: [
-          // Video background
+          // Video background - NOW WITH REAL VIDEO
           Positioned.fill(
             child: _buildVideoBackground(),
           ),
@@ -186,105 +236,176 @@ class _FakeVideoPlayerState extends State<FakeVideoPlayer>
             ),
 
           // Loading overlay
-          if (!_isVideoLoaded)
+          if (_isVideoLoading)
             Positioned.fill(
               child: _buildLoadingOverlay(),
+            ),
+
+          // Video controls (optional)
+          if (widget.showControls && _isVideoInitialized && !_hasVideoError)
+            Positioned(
+              bottom: 100,
+              right: 20,
+              child: _buildVideoControls(),
             ),
         ],
       ),
     );
   }
 
+  // UPDATED: Now uses real video player
   Widget _buildVideoBackground() {
-    if (!_isVideoLoaded) {
-      return Container(
-        color: Colors.grey.shade900,
-        child: Center(
-          child: LetterAvatar(
-            name: widget.session.fakeVideo.user.name,
-            size: 150,
-            imageUrls: [widget.session.fakeVideo.thumbnailUrl],
-            showBorder: false,
-          ),
-        ),
-      );
+    // If video is working, show it
+    if (_isVideoInitialized && !_hasVideoError && _videoController != null) {
+      return VideoPlayer(_videoController!);
     }
 
-    // Since we can't actually play video from Google Drive URLs directly,
-    // we'll create a simulated video effect using the thumbnail
-    return AnimatedBuilder(
-      animation: _videoController,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.black.withOpacity(0.3),
-                Colors.transparent,
-                Colors.black.withOpacity(0.5),
-              ],
-            ),
-          ),
-          child: Stack(
-            children: [
-              // Background image with subtle animation
-              Positioned.fill(
-                child: Transform.scale(
-                  scale: 1.0 + (_videoController.value * 0.02), // Subtle zoom effect
-                  child: CachedNetworkImage(
-                    imageUrl: widget.session.fakeVideo.thumbnailUrl,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(
-                      color: Colors.grey.shade800,
-                      child: Center(
-                        child: LetterAvatar(
-                          name: widget.session.fakeVideo.user.name,
-                          size: 100,
-                        ),
-                      ),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      color: Colors.grey.shade800,
-                      child: Center(
-                        child: LetterAvatar(
-                          name: widget.session.fakeVideo.user.name,
-                          size: 100,
-                        ),
-                      ),
-                    ),
+    // If video failed or loading, show fallback
+    return _buildFallbackBackground();
+  }
+
+  Widget _buildFallbackBackground() {
+    return Container(
+      color: Colors.grey.shade900,
+      child: Stack(
+        children: [
+          // Background image
+          Positioned.fill(
+            child: CachedNetworkImage(
+              imageUrl: widget.session.fakeVideo.thumbnailUrl,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => Container(
+                color: Colors.grey.shade800,
+                child: Center(
+                  child: LetterAvatar(
+                    name: widget.session.fakeVideo.user.name,
+                    size: 100,
                   ),
                 ),
               ),
-
-              // Subtle overlay to simulate video movement
-              Positioned.fill(
-                child: AnimatedBuilder(
-                  animation: _videoController,
-                  builder: (context, child) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment(
-                            sin(_videoController.value * 2 * pi) * 0.1,
-                            cos(_videoController.value * 2 * pi) * 0.1,
-                          ),
-                          radius: 1.5,
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withOpacity(0.1),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
+              errorWidget: (context, url, error) => Container(
+                color: Colors.grey.shade800,
+                child: Center(
+                  child: LetterAvatar(
+                    name: widget.session.fakeVideo.user.name,
+                    size: 100,
+                  ),
                 ),
               ),
-            ],
+            ),
           ),
-        );
-      },
+
+          // Error overlay if video failed
+          if (_hasVideoError)
+            Container(
+              color: Colors.black.withOpacity(0.7),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.videocam_off,
+                      size: 64,
+                      color: Colors.white70,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Video unavailable',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Showing profile photo instead',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (_videoErrorMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 40),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.withOpacity(0.5)),
+                        ),
+                        child: Text(
+                          'Error: ${_videoErrorMessage!.length > 60 ? _videoErrorMessage!.substring(0, 60) + "..." : _videoErrorMessage!}',
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 12,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        setState(() {
+                          _isVideoLoading = true;
+                          _hasVideoError = false;
+                          _videoErrorMessage = null;
+                        });
+                        _initializeVideo();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Retry Video'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // NEW: Video controls
+  Widget _buildVideoControls() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.6),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          IconButton(
+            onPressed: () {
+              if (_videoController!.value.isPlaying) {
+                _videoController!.pause();
+              } else {
+                _videoController!.play();
+              }
+              setState(() {});
+            },
+            icon: Icon(
+              _videoController!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+              color: Colors.white,
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              _videoController!.seekTo(Duration.zero);
+              _videoController!.play();
+            },
+            icon: const Icon(
+              Icons.replay,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -405,7 +526,7 @@ class _FakeVideoPlayerState extends State<FakeVideoPlayer>
             ),
             SizedBox(height: 24),
             Text(
-              'Connecting...',
+              'Loading video...',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,

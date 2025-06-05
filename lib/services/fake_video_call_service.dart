@@ -1,4 +1,4 @@
-// lib/services/fake_video_call_service.dart
+// lib/services/fake_video_call_service.dart - Updated with working video URLs
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
@@ -14,11 +14,11 @@ class FakeVideoCallService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Random _random = Random();
 
-  // Fake video URLs from Google Drive (you'll need to replace these with actual URLs)
+  // UPDATED: Replace Google Drive URLs with working video URLs
   final List<FakeVideoData> _fakeVideos = [
     FakeVideoData(
-      videoUrl: 'https://drive.google.com/uc?id=14DWArOTvKk4KYxljVQv4SLLU-8GAErLH&export=download',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1742832599361-7aa7decd73b4?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxmZWF0dXJlZC1waG90b3MtZmVlZHwxfHx8ZW58MHx8fHx8',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=500&auto=format&fit=crop&q=60',
       duration: Duration(minutes: 3),
       user: FakeUserData(
         name: 'Emma',
@@ -28,8 +28,8 @@ class FakeVideoCallService {
       ),
     ),
     FakeVideoData(
-      videoUrl: 'https://drive.google.com/file/d/14DWArOTvKk4KYxljVQv4SLLU-8GAErLH/view?usp=drive_link',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1742832599361-7aa7decd73b4?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxmZWF0dXJlZC1waG90b3MtZmVlZHwxfHx8ZW58MHx8fHx8',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&auto=format&fit=crop&q=60',
       duration: Duration(minutes: 4),
       user: FakeUserData(
         name: 'Sarah',
@@ -39,8 +39,8 @@ class FakeVideoCallService {
       ),
     ),
     FakeVideoData(
-      videoUrl: 'https://drive.google.com/uc?id=YOUR_VIDEO_ID_3',
-      thumbnailUrl: 'https://drive.google.com/uc?id=YOUR_THUMBNAIL_ID_3',
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&auto=format&fit=crop&q=60',
       duration: Duration(minutes: 2, seconds: 30),
       user: FakeUserData(
         name: 'Jessica',
@@ -49,25 +49,41 @@ class FakeVideoCallService {
         interests: ['Fitness', 'Movies', 'Dancing'],
       ),
     ),
-    // Add more fake videos as needed
+    FakeVideoData(
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?w=500&auto=format&fit=crop&q=60',
+      duration: Duration(minutes: 1, seconds: 45),
+      user: FakeUserData(
+        name: 'Mia',
+        age: 25,
+        location: 'Los Angeles',
+        interests: ['Nature', 'Adventure', 'Photography'],
+      ),
+    ),
+    FakeVideoData(
+      videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=500&auto=format&fit=crop&q=60',
+      duration: Duration(minutes: 1, seconds: 10),
+      user: FakeUserData(
+        name: 'Olivia',
+        age: 27,
+        location: 'Miami',
+        interests: ['Beach', 'Sports', 'Music'],
+      ),
+    ),
   ];
 
-  // Get a random fake video for simulation
+  // Rest of your existing methods remain the same...
+
   FakeVideoData getRandomFakeVideo() {
     return _fakeVideos[_random.nextInt(_fakeVideos.length)];
   }
 
-  // Simulate finding a match with delay
   Future<app_models.User?> simulateFindingMatch() async {
     print('Starting fake video call simulation...');
-
-    // Add some realistic delay
     await Future.delayed(Duration(seconds: 3 + _random.nextInt(5)));
 
-    // Get random fake video
     final fakeVideo = getRandomFakeVideo();
-
-    // Create a fake user model
     final fakeUser = app_models.User(
       id: 'fake_${DateTime.now().millisecondsSinceEpoch}',
       name: fakeVideo.user.name,
@@ -82,25 +98,20 @@ class FakeVideoCallService {
     return fakeUser;
   }
 
-  // Check if we should use fake video (when no real users available)
   Future<bool> shouldUseFakeVideo() async {
     try {
-      // Check if there are any other users in the call queue
       final queueSnapshot = await _firestore
           .collection('call_queue')
           .where('status', isEqualTo: 'waiting')
           .limit(1)
           .get();
-
-      // If no users in queue, use fake video
       return queueSnapshot.docs.isEmpty;
     } catch (e) {
       print('Error checking queue: $e');
-      return true; // Default to fake video on error
+      return true;
     }
   }
 
-  // Start fake video call session
   Future<FakeCallSession?> startFakeVideoCall() async {
     try {
       final fakeVideo = getRandomFakeVideo();
@@ -108,7 +119,6 @@ class FakeVideoCallService {
 
       if (currentUserId == null) return null;
 
-      // Create fake call session
       final session = FakeCallSession(
         sessionId: 'fake_session_${DateTime.now().millisecondsSinceEpoch}',
         fakeVideo: fakeVideo,
@@ -116,9 +126,7 @@ class FakeVideoCallService {
         currentUserId: currentUserId,
       );
 
-      // Log the fake call session
       await _logFakeCallSession(session);
-
       return session;
     } catch (e) {
       print('Error starting fake video call: $e');
@@ -126,7 +134,6 @@ class FakeVideoCallService {
     }
   }
 
-  // Log fake call session for analytics
   Future<void> _logFakeCallSession(FakeCallSession session) async {
     try {
       await _firestore.collection('fake_call_sessions').add({
@@ -142,7 +149,6 @@ class FakeVideoCallService {
     }
   }
 
-  // End fake call session
   Future<void> endFakeCallSession(String sessionId) async {
     try {
       final sessionQuery = await _firestore
@@ -162,7 +168,6 @@ class FakeVideoCallService {
     }
   }
 
-  // Generate realistic call events
   Stream<FakeCallEvent> generateCallEvents() {
     return Stream.periodic(Duration(seconds: 2 + _random.nextInt(8)), (index) {
       final events = [
@@ -172,12 +177,10 @@ class FakeVideoCallService {
         FakeCallEvent.nod,
         FakeCallEvent.laugh,
       ];
-
       return events[_random.nextInt(events.length)];
     });
   }
 
-  // Get conversation starters for fake calls
   List<String> getConversationStarters() {
     return [
       "Hi there! How's your day going?",
@@ -189,7 +192,6 @@ class FakeVideoCallService {
     ];
   }
 
-  // Get fake responses
   List<String> getFakeResponses() {
     return [
       "That's so cool!",
@@ -204,7 +206,7 @@ class FakeVideoCallService {
   }
 }
 
-// Data models for fake video calls
+// Keep your existing data model classes unchanged
 class FakeVideoData {
   final String videoUrl;
   final String thumbnailUrl;
