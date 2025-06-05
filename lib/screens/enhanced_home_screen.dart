@@ -286,7 +286,7 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Swipe rewound! You have another chance.'),
+            content: Text('Swipe rewound successfully'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -663,15 +663,11 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
               children: [
                 // Rewind button (could be premium feature)
                 // Rewind button (could be premium feature)
-                SwipeActionButton(
+                // Rewind button
+                SwipeActionButton( //hade
                   icon: Icons.replay,
                   color: Colors.amber,
-                  onTap: () {
-                    // Navigate directly to premium screen
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => PremiumScreen()),
-                    );
-                  },
+                  onTap: _handleRewind,
                   size: 44,
                 ),
 

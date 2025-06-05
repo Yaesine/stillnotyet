@@ -57,7 +57,35 @@ class RewindService {
   // Check if user has available rewinds
   Future<bool> canRewind() async {
     try {
-      // Check if user has available rewinds from streak rewards
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) return false;
+
+      // First check if user is admin
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        bool isAdmin = userData['isAdmin'] ?? false;
+
+        // Admin has unlimited rewinds
+        if (isAdmin) {
+          print('Admin user detected - unlimited rewinds available');
+          return true;
+        }
+
+        // Also check if they have premium with rewind feature
+        bool isPremium = userData['isPremium'] ?? false;
+        if (isPremium) {
+          // For premium users, check if they have the rewind feature
+          List<dynamic> premiumFeatures = userData['premiumFeatures'] ?? [];
+          if (premiumFeatures.contains('rewind') ||
+              premiumFeatures.contains('all_premium_features')) {
+            print('Premium user with rewind feature - unlimited rewinds available');
+            return true;
+          }
+        }
+      }
+
+      // For non-admin users, check streak rewards
       final streakData = await _streakService.getStreakData();
       if (streakData == null) return false;
 
@@ -69,16 +97,55 @@ class RewindService {
   }
 
   // Perform rewind operation
+// Modified rewind method for lib/services/rewind_service.dart
+// This version doesn't deduct rewinds for admin users
+
+  // Perform rewind operation
   Future<Map<String, dynamic>> rewind() async {
     try {
-      // First check if rewind is available
-      final canDoRewind = await canRewind();
-      if (!canDoRewind) {
+      // Get current user ID
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
         return {
           'success': false,
-          'message': 'No rewinds available',
+          'message': 'Not authenticated',
           'user': null
         };
+      }
+
+      // Check if user is admin or premium first
+      bool isAdminOrPremium = false;
+
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        bool isAdmin = userData['isAdmin'] ?? false;
+        bool isPremium = userData['isPremium'] ?? false;
+
+        // Admin or premium users with rewind feature don't consume rewards
+        if (isAdmin) {
+          print('Admin user detected - unlimited rewinds available');
+          isAdminOrPremium = true;
+        } else if (isPremium) {
+          List<dynamic> premiumFeatures = userData['premiumFeatures'] ?? [];
+          if (premiumFeatures.contains('rewind') ||
+              premiumFeatures.contains('all_premium_features')) {
+            print('Premium user with rewind feature');
+            isAdminOrPremium = true;
+          }
+        }
+      }
+
+      // If not admin/premium, check if rewind is available
+      if (!isAdminOrPremium) {
+        final canDoRewind = await canRewind();
+        if (!canDoRewind) {
+          return {
+            'success': false,
+            'message': 'No rewinds available',
+            'user': null
+          };
+        }
       }
 
       // Get last swipe
@@ -91,7 +158,7 @@ class RewindService {
         };
       }
 
-      // Get the user who was swiped - use app's User model, not Firebase Auth
+      // Get the user who was swiped
       final User? swipedUser = await _firestoreService.getUserData(lastSwipe['swipedUserId']);
       if (swipedUser == null) {
         return {
@@ -106,13 +173,11 @@ class RewindService {
 
       // If it was a match, we need to undo that as well
       if (lastSwipe['liked'] || lastSwipe['superLiked']) {
-        final userId = _auth.currentUser?.uid;
         final matchId = '$userId-${lastSwipe['swipedUserId']}';
         final reverseMatchId = '${lastSwipe['swipedUserId']}-$userId';
 
-        // Check if match exists (only if it was a like or superlike)
+        // Check if match exists
         final matchDoc = await _firestore.collection('matches').doc(matchId).get();
-
         if (matchDoc.exists) {
           // Delete both match records
           await _firestore.collection('matches').doc(matchId).delete();
@@ -120,8 +185,12 @@ class RewindService {
         }
       }
 
-      // Use a rewind from streak rewards
-      await _streakService.useReward(RewardType.rewind, 1);
+      // Only use a rewind from streak rewards if NOT admin/premium
+      if (!isAdminOrPremium) {
+        await _streakService.useReward(RewardType.rewind, 1);
+      } else {
+        print('Admin/Premium user rewind - no rewards consumed');
+      }
 
       // Return success with the recovered user
       return {
