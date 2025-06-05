@@ -259,13 +259,15 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
     });
 
     try {
-      final rewindService = RewindService();
-      final canDoRewind = await rewindService.canRewind();
+      // First check if user has premium with rewind feature or is admin
+      final userProvider = Provider.of<UserProvider>(context, listen: false);
+      final hasRewindFeature = await userProvider.hasFeature('rewind');
 
-      if (!canDoRewind) {
+      if (!hasRewindFeature) {
+        // User doesn't have premium or admin - show premium screen
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('No rewinds available. Earn more through daily logins!'),
+            content: Text('Rewind is a premium feature. Upgrade to use it!'),
             behavior: SnackBarBehavior.floating,
             action: SnackBarAction(
               label: 'PREMIUM',
@@ -277,16 +279,21 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
             ),
           ),
         );
+        setState(() {
+          _isActionInProgress = false;
+        });
         return;
       }
 
-      final result = await Provider.of<UserProvider>(context, listen: false).rewindLastSwipe();
+      // For premium/admin users, proceed with rewind operation
+      final rewindService = RewindService();
+      final result = await userProvider.rewindLastSwipe();
 
       if (result['success']) {
         // Show success message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Swipe rewound successfully'),
+            content: Text('Swipe rewound! You have another chance.'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -316,7 +323,6 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
       });
     }
   }
-
   void _handleSwipeLeft(String userId) {
     // Immediately update UI to show next profile
     Provider.of<UserProvider>(context, listen: false).removeProfileLocally(userId);
