@@ -1,6 +1,9 @@
 // lib/screens/premium_screen.dart
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class PremiumScreen extends StatefulWidget {
   final String? promoCode;
@@ -15,6 +18,8 @@ class _PremiumScreenState extends State<PremiumScreen> {
   final TextEditingController _promoController = TextEditingController();
   bool _discountApplied = false;
   double _discountPercentage = 0.0;
+  bool _isAdmin = false;
+  bool _isLoading = false;
 
   // Original prices
   final Map<String, double> _originalPrices = {
@@ -35,6 +40,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
         _applyPromoCode();
       });
     }
+
+    // Check if user already has admin status
+    _checkAdminStatus();
   }
 
   @override
@@ -43,10 +51,132 @@ class _PremiumScreenState extends State<PremiumScreen> {
     super.dispose();
   }
 
-  void _applyPromoCode() {
+  // Check if user already has admin privileges
+  Future<void> _checkAdminStatus() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Check in SharedPreferences first (for quick access)
+      final prefs = await SharedPreferences.getInstance();
+      final isAdmin = prefs.getBool('isAdmin') ?? false;
+
+      if (isAdmin) {
+        setState(() {
+          _isAdmin = true;
+        });
+      } else {
+        // Also check Firestore for admin status
+        final userId = FirebaseAuth.instance.currentUser?.uid;
+        if (userId != null) {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .get();
+
+          if (userDoc.exists) {
+            final userData = userDoc.data();
+            final isAdminInFirestore = userData?['isAdmin'] ?? false;
+
+            if (isAdminInFirestore) {
+              // Update local preference
+              await prefs.setBool('isAdmin', true);
+
+              setState(() {
+                _isAdmin = true;
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      print('Error checking admin status: $e');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  // Apply admin status to the user
+  Future<void> _applyAdminStatus() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final userId = FirebaseAuth.instance.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Update Firestore
+      await FirebaseFirestore.instance.collection('users').doc(userId).update({
+        'isAdmin': true,
+        'isPremium': true,
+        'premiumUntil': Timestamp.fromDate(
+          DateTime.now().add(Duration(days: 365 * 10)), // 10 years of premium
+        ),
+        'adminGrantedAt': FieldValue.serverTimestamp(),
+        'adminPremiumFeatures': [
+          'unlimited_likes',
+          'see_who_likes_you',
+          'super_likes',
+          'rewind',
+          'boosts',
+          'advanced_filters',
+          'premium_badge',
+          'read_receipts',
+          'priority_matches',
+          'all_premium_features'
+        ],
+      });
+
+      // Update local preferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isAdmin', true);
+      await prefs.setBool('isPremium', true);
+
+      setState(() {
+        _isAdmin = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('🎉 Admin privileges granted with all premium features!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 5),
+        ),
+      );
+    } catch (e) {
+      print('Error applying admin status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error granting admin privileges: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _applyPromoCode() async {
     final code = _promoController.text.trim();
 
-    if (code.toLowerCase() == 'marifecto50') {
+    // Check for admin code
+    if (code.toLowerCase() == 'admin1234') {
+      // Apply admin privileges
+      await _applyAdminStatus();
+      return;
+    }
+    // Check for discount code
+    else if (code.toLowerCase() == 'marifecto50') {
       setState(() {
         _discountApplied = true;
         _discountPercentage = 0.5; // 50% discount
@@ -62,7 +192,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
           ),
         );
       }
-    } else if (code.isNotEmpty) {
+    }
+    // Invalid code
+    else if (code.isNotEmpty) {
       setState(() {
         _discountApplied = false;
         _discountPercentage = 0.0;
@@ -150,6 +282,47 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         ),
                         SizedBox(height: 24),
 
+                        // Admin Status Banner
+                        if (_isAdmin)
+                          Container(
+                            margin: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            padding: EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: Colors.green),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.admin_panel_settings, color: Colors.white, size: 28),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Admin Mode Active',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'All premium features unlocked!',
+                                        style: TextStyle(
+                                          color: Colors.white.withOpacity(0.9),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         // Premium features
                         _buildPremiumFeature(
                           icon: Icons.workspace_premium,
@@ -212,7 +385,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                                   ),
                                   SizedBox(width: 12),
                                   ElevatedButton(
-                                    onPressed: _applyPromoCode,
+                                    onPressed: _isLoading ? null : _applyPromoCode,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: Colors.white,
                                       foregroundColor: AppColors.primary,
@@ -221,11 +394,20 @@ class _PremiumScreenState extends State<PremiumScreen> {
                                       ),
                                       padding: EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                                     ),
-                                    child: Text('Apply'),
+                                    child: _isLoading
+                                        ? SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                                      ),
+                                    )
+                                        : Text('Apply'),
                                   ),
                                 ],
                               ),
-                              if (_discountApplied) ...[
+                              if (_discountApplied && !_isAdmin) ...[
                                 SizedBox(height: 12),
                                 Container(
                                   padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -255,30 +437,40 @@ class _PremiumScreenState extends State<PremiumScreen> {
                           ),
                         ),
 
-                        // Pricing options
-                        SizedBox(height: 16),
-                        _buildPriceOption('6 months', _originalPrices['6 months']!, 'Save 50%'),
-                        _buildPriceOption('3 months', _originalPrices['3 months']!, 'Save 33%'),
-                        _buildPriceOption('1 month', _originalPrices['1 month']!, ''),
+                        // Pricing options - only show if not admin
+                        if (!_isAdmin) ...[
+                          SizedBox(height: 16),
+                          _buildPriceOption('6 months', _originalPrices['6 months']!, 'Save 50%'),
+                          _buildPriceOption('3 months', _originalPrices['3 months']!, 'Save 33%'),
+                          _buildPriceOption('1 month', _originalPrices['1 month']!, ''),
+                        ],
 
-                        // Subscribe button
+                        // Subscribe button or Continue button for admin
                         Padding(
                           padding: const EdgeInsets.all(24.0),
                           child: SizedBox(
                             width: double.infinity,
-                            child:
-                            ElevatedButton(
+                            child: ElevatedButton(
                               onPressed: () {
-                                Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
-
-                                // Implement subscription logic
-
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Subscription successful!'),
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
+                                if (_isAdmin) {
+                                  // Admin doesn't need to subscribe
+                                  Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Admin access activated!'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                } else {
+                                  // Regular subscribe flow
+                                  Navigator.of(context).pushNamedAndRemoveUntil('/main', (route) => false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Subscription successful!'),
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
                               },
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
@@ -290,7 +482,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
                                 elevation: 2,
                               ),
                               child: Text(
-                                'Subscribe Now',
+                                _isAdmin ? 'Continue with Admin Access' : 'Subscribe Now',
                                 style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
@@ -350,6 +542,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
               ),
             ],
           ),
+          if (_isAdmin) ...[
+            Spacer(),
+            Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: 24,
+            )
+          ],
         ],
       ),
     );

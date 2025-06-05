@@ -6,7 +6,10 @@ import '../data/dummy_data.dart';
 import '../models/user_model.dart';  // Only import once
 import '../models/match_model.dart';
 import '../services/firestore_service.dart';
-
+import '../services/rewind_service.dart';
+import 'package:flutter/material.dart';
+import '../models/user_model.dart';
+import '../services/premium_service.dart';
 
 class UserProvider with ChangeNotifier {
   final FirestoreService _firestoreService = FirestoreService();
@@ -17,7 +20,14 @@ class UserProvider with ChangeNotifier {
   User? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
+  final PremiumService _premiumService = PremiumService();
+  bool _isAdmin = false;
+  bool _isPremium = false;
+  int _dailyLikesRemaining = 100; // Default daily like limit for non-premium users
 
+  // Additional getters
+  bool get isAdmin => _isAdmin;
+  bool get isPremium => _isPremium;
   // Properties for likes tab
   List<User> _usersWhoLikedMe = [];
   List<Map<String, dynamic>> _profileVisitors = [];
@@ -45,6 +55,7 @@ class UserProvider with ChangeNotifier {
   // Initialize and load current user data
   Future<void> initialize() async {
     await loadCurrentUser();
+    await checkPremiumStatus(); // Add this line
     await loadPotentialMatches();
     await loadMatches();
     await loadUsersWhoLikedMe();
@@ -53,6 +64,20 @@ class UserProvider with ChangeNotifier {
     await loadVisitsHistory();
   }
 
+  // Add method to check if a specific feature is available
+  Future<bool> hasFeature(String featureName) async {
+    return await _premiumService.hasFeature(featureName);
+  }
+
+  Future<void> checkPremiumStatus() async {
+    try {
+      _isAdmin = await _premiumService.isAdmin();
+      _isPremium = await _premiumService.isPremium();
+      notifyListeners();
+    } catch (e) {
+      print('Error checking premium status: $e');
+    }
+  }
   // New methods to load history
   Future<void> loadLikesHistory() async {
     _isLoading = true;
@@ -206,6 +231,46 @@ class UserProvider with ChangeNotifier {
     }
   }
 
+  // Add this method to the UserProvider class in lib/providers/user_provider.dart
+
+  Future<Map<String, dynamic>> rewindLastSwipe() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final rewindService = RewindService();
+      final result = await rewindService.rewind();
+
+      if (result['success'] && result['user'] != null) {
+        // Add the user back to the potential matches at the beginning
+        User recoveredUser = result['user'];
+        _potentialMatches.insert(0, recoveredUser);
+
+        // If it was a match that we undid, we need to update matched users list
+        _matchedUsers.removeWhere((user) => user.id == recoveredUser.id);
+
+        // Refresh matches list just to be safe
+        await loadMatches();
+      }
+
+      _isLoading = false;
+      notifyListeners();
+      return result;
+    } catch (e) {
+      _errorMessage = 'Failed to rewind: $e';
+      print('Error rewinding: $e');
+      _isLoading = false;
+      notifyListeners();
+      return {
+        'success': false,
+        'message': 'Error: $e',
+        'user': null
+      };
+    }
+  }
+
+
 // Helper method to apply filters locally to dummy data
   Future<List<User>> _applyFiltersToLocalData(List<User> users) async {
     try {
@@ -258,8 +323,18 @@ class UserProvider with ChangeNotifier {
         throw Exception('No current user ID available');
       }
 
-      _usersWhoLikedMe = await _firestoreService.getUsersWhoLikedMe();
-      print('Loaded ${_usersWhoLikedMe.length} users who liked me');
+      // Check if user has premium or admin access
+      bool canSeeWhoLikedMe = await _premiumService.hasFeature('see_who_likes_you');
+
+      if (canSeeWhoLikedMe) {
+        // User has premium/admin access - load all users who liked them
+        _usersWhoLikedMe = await _firestoreService.getUsersWhoLikedMe();
+        print('Loaded ${_usersWhoLikedMe.length} users who liked me');
+      } else {
+        // Standard user - only show a limited preview or blurred cards
+        // You could implement a preview system here
+        _usersWhoLikedMe = []; // No users shown for non-premium
+      }
     } catch (e) {
       print('Error loading users who liked me: $e');
       _usersWhoLikedMe = []; // Reset to empty list on error
@@ -267,6 +342,20 @@ class UserProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<bool> canSendUnlimitedLikes() async {
+    return await _premiumService.hasFeature('unlimited_likes');
+  }
+
+// Add method to check if the user can use rewind feature
+  Future<bool> canUseRewind() async {
+    return await _premiumService.hasFeature('rewind');
+  }
+
+// Add method to check if the user can use super likes
+  Future<bool> canUseSuperLike() async {
+    return await _premiumService.hasFeature('super_likes');
   }
 
   // Load users who have visited current user's profile
@@ -418,6 +507,20 @@ class UserProvider with ChangeNotifier {
   // Swipe right (like)
   Future<User?> swipeRight(String userId) async {
     try {
+      // Check if user has run out of daily likes and doesn't have premium
+      if (!await canSendUnlimitedLikes() && _dailyLikesRemaining <= 0) {
+        // Show premium upsell - this should be implemented in your UI
+        _errorMessage = 'You have used all your daily likes. Upgrade to Premium for unlimited likes!';
+        notifyListeners();
+        return null;
+      }
+
+      // If user doesn't have unlimited likes, decrease the counter
+      if (!await canSendUnlimitedLikes()) {
+        _dailyLikesRemaining--;
+      }
+
+      // Continue with existing implementation
       bool isMatch = await _firestoreService.recordSwipe(userId, true);
       User? matchedUser;
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/user_provider.dart';
 import '../models/user_model.dart';
 import '../animations/modern_match_animation.dart';
+import '../services/rewind_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/components/app_button.dart';
 import '../widgets/enhanced_swipe_card.dart';
@@ -248,6 +249,74 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
     );
   }
 
+  // Add this to your EnhancedHomeScreen class in lib/screens/enhanced_home_screen.dart
+
+  void _handleRewind() async {
+    if (_isActionInProgress) return;
+
+    setState(() {
+      _isActionInProgress = true;
+    });
+
+    try {
+      final rewindService = RewindService();
+      final canDoRewind = await rewindService.canRewind();
+
+      if (!canDoRewind) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('No rewinds available. Earn more through daily logins!'),
+            behavior: SnackBarBehavior.floating,
+            action: SnackBarAction(
+              label: 'PREMIUM',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (context) => PremiumScreen()),
+                );
+              },
+            ),
+          ),
+        );
+        return;
+      }
+
+      final result = await Provider.of<UserProvider>(context, listen: false).rewindLastSwipe();
+
+      if (result['success']) {
+        // Show success message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Swipe rewound! You have another chance.'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result['message']),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error handling rewind: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error processing rewind: $e'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isActionInProgress = false;
+      });
+    }
+  }
+
   void _handleSwipeLeft(String userId) {
     // Immediately update UI to show next profile
     Provider.of<UserProvider>(context, listen: false).removeProfileLocally(userId);
@@ -431,25 +500,10 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
           SwipeActionButton(
             icon: Icons.replay,
             color: Colors.amber,
-            onTap: () {
-              // Implement rewind functionality (premium feature)
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Upgrade to premium to unlock this feature'),
-                  behavior: SnackBarBehavior.floating,
-                  action: SnackBarAction(
-                    label: 'UPGRADE',
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(builder: (context) => PremiumScreen()),
-                      );
-                    },
-                  ),
-                ),
-              );
-            },
+            onTap: _handleRewind,  // Updated to use our rewind handler
             size: 44,
           ),
+
 
           // Dislike button
           SwipeActionButton(
@@ -666,6 +720,8 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
 
     return Stack(children: stackChildren);
   }
+
+
 
   // NEW: Swipe instruction overlay
   Widget _buildSwipeInstructions() {
