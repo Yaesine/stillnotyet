@@ -5,7 +5,7 @@ import '../models/match_model.dart';
 
 class DummyData {
   // Remote data source URL
-  static const String _remoteDataUrl = 'https://rankboostads.com/Marifecto.json';
+  static const String _remoteDataUrl = 'https://drive.google.com/uc?export=download&id=1zklsj1uujdmF4SQVyCybiwqBvE3j_nnY';
 
   // Cache for the fetched data
   static Map<String, dynamic>? _cachedData;
