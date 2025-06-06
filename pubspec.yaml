@@ -29,7 +29,9 @@ dependencies:
   sign_in_with_apple: ^5.0.0
   crypto: ^3.0.3
   video_player: ^2.8.1
-  in_app_purchase: ^3.2.0  # Use the latest stable version
+  in_app_purchase: ^3.2.3
+  in_app_purchase_storekit: ^0.4.1
+  in_app_purchase_android: ^0.4.0+2
   # Other dependencies from your original file
   image_picker: ^0.8.9
   uuid: ^3.0.7
