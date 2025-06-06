@@ -6,7 +6,417 @@ const {onSchedule} = require("firebase-functions/v2/scheduler");
 const {onCall} = require("firebase-functions/v2/https");
 const {RtcTokenBuilder, RtcRole} = require("agora-token");
 
+const axios = require("axios");
+
+// Add these constants after your existing constants
+const APPLE_SANDBOX_URL = "https://sandbox.itunes.apple.com/verifyReceipt";
+const APPLE_PRODUCTION_URL = "https://buy.itunes.apple.com/verifyReceipt";
+// Set your shared secret in Firebase config: firebase functions:config:set apple.shared_secret="YOUR_SECRET"
+// Or define it here for testing (but use config in production)
+const APPLE_SHARED_SECRET = functions.config().apple?.shared_secret || "a59d6df893014ff289b8ad565bbaff0b";
+
 admin.initializeApp();
+
+// Add this function to your existing index.js file
+exports.validateAppleReceipt = onCall(async (request) => {
+  // Verify user is authenticated
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+  }
+
+  const {receiptData, productId} = request.data;
+  const userId = request.auth.uid;
+
+  if (!receiptData) {
+    throw new functions.https.HttpsError("invalid-argument", "Receipt data is required");
+  }
+
+  console.log(`Validating Apple receipt for user ${userId}, product ${productId}`);
+
+  try {
+    // First try production URL
+    let response = await validateWithApple(APPLE_PRODUCTION_URL, receiptData);
+
+    // If sandbox receipt (status 21007), try sandbox URL
+    if (response.data.status === 21007) {
+      console.log("Receipt is from sandbox, retrying with sandbox URL");
+      response = await validateWithApple(APPLE_SANDBOX_URL, receiptData);
+    }
+
+    const validationResult = response.data;
+
+    if (validationResult.status !== 0) {
+      console.error(`Invalid receipt status: ${validationResult.status}`);
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `Invalid receipt: ${getStatusMessage(validationResult.status)}`,
+      );
+    }
+
+    // Parse receipt info
+    const receipt = validationResult.receipt;
+    const latestReceiptInfo = validationResult.latest_receipt_info || [];
+    const pendingRenewalInfo = validationResult.pending_renewal_info || [];
+
+    console.log(`Found ${latestReceiptInfo.length} purchases in receipt`);
+
+    // Find the relevant purchase
+    const purchase = latestReceiptInfo.find((item) => item.product_id === productId) ||
+                    latestReceiptInfo[latestReceiptInfo.length - 1]; // Get latest if specific not found
+
+    if (!purchase) {
+      throw new functions.https.HttpsError("not-found", "Purchase not found in receipt");
+    }
+
+    console.log(`Processing purchase for product ${purchase.product_id}`);
+
+    // Check if purchase is valid and not expired
+    const now = Date.now();
+    const expiresDateMs = purchase.expires_date_ms ? parseInt(purchase.expires_date_ms) : null;
+
+    if (expiresDateMs && expiresDateMs < now) {
+      console.log("Subscription has expired");
+      // Still process it but mark as expired
+      await handleExpiredSubscription(userId, purchase);
+
+      return {
+        success: true,
+        expired: true,
+        productId: purchase.product_id,
+        expiresDate: new Date(expiresDateMs),
+      };
+    }
+
+    // Grant the purchase
+    await grantPurchase(userId, purchase);
+
+    // Store receipt for future reference and restoration
+    await storeReceipt(userId, purchase, receipt, validationResult.latest_receipt);
+
+    // Handle auto-renewal status
+    if (pendingRenewalInfo.length > 0) {
+      await handlePendingRenewal(userId, pendingRenewalInfo[0]);
+    }
+
+    return {
+      success: true,
+      productId: purchase.product_id,
+      expiresDate: expiresDateMs ? new Date(expiresDateMs) : null,
+      originalTransactionId: purchase.original_transaction_id,
+    };
+  } catch (error) {
+    console.error("Receipt validation error:", error);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError("internal", "Failed to validate receipt");
+  }
+});
+
+// Helper function to validate with Apple
+async function validateWithApple(url, receiptData) {
+  try {
+    return await axios.post(url, {
+      "receipt-data": receiptData,
+      "password": APPLE_SHARED_SECRET,
+      "exclude-old-transactions": true,
+    }, {
+      timeout: 10000, // 10 second timeout
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  } catch (error) {
+    console.error("Error calling Apple API:", error.message);
+    throw new functions.https.HttpsError("internal", "Failed to contact Apple servers");
+  }
+}
+
+// Grant purchase to user
+async function grantPurchase(userId, purchase) {
+  const productId = purchase.product_id;
+  const db = admin.firestore();
+  const batch = db.batch();
+
+  try {
+    const userRef = db.collection("users").doc(userId);
+
+    // Handle different product types
+    if (productId.includes("premium")) {
+      // Premium subscription
+      const expiresDate = new Date(parseInt(purchase.expires_date_ms));
+      const subscriptionType = productId.split(".").pop(); // monthly, 3months, 6months
+
+      batch.update(userRef, {
+        isPremium: true,
+        premiumUntil: admin.firestore.Timestamp.fromDate(expiresDate),
+        premiumType: subscriptionType,
+        premiumStartDate: admin.firestore.Timestamp.fromDate(new Date(parseInt(purchase.purchase_date_ms))),
+        lastReceiptValidation: admin.firestore.FieldValue.serverTimestamp(),
+        premiumFeatures: [
+          "unlimited_likes",
+          "see_who_likes_you",
+          "super_likes",
+          "rewind",
+          "read_receipts",
+          "priority_matches",
+        ],
+      });
+
+      console.log(`Granted premium subscription until ${expiresDate} for user ${userId}`);
+    } else if (productId.includes("boost")) {
+      // Boost packs
+      const boostCount = getBoostCount(productId);
+
+      batch.update(userRef, {
+        availableBoosts: admin.firestore.FieldValue.increment(boostCount),
+        lastBoostPurchase: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      console.log(`Granted ${boostCount} boosts to user ${userId}`);
+    } else if (productId.includes("superlike")) {
+      // Super like packs
+      const superLikeCount = getSuperLikeCount(productId);
+
+      batch.update(userRef, {
+        availableSuperLikes: admin.firestore.FieldValue.increment(superLikeCount),
+        lastSuperLikePurchase: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      // Also update streak data if it exists
+      const streakRef = db.collection("users").doc(userId).collection("streak_data").doc("current");
+      const streakDoc = await streakRef.get();
+
+      if (streakDoc.exists) {
+        batch.update(streakRef, {
+          availableSuperLikes: admin.firestore.FieldValue.increment(superLikeCount),
+        });
+      }
+
+      console.log(`Granted ${superLikeCount} super likes to user ${userId}`);
+    }
+
+    await batch.commit();
+    console.log(`Successfully granted purchase ${productId} to user ${userId}`);
+  } catch (error) {
+    console.error("Error granting purchase:", error);
+    throw new functions.https.HttpsError("internal", "Failed to grant purchase");
+  }
+}
+
+// Store receipt for restoration and record keeping
+async function storeReceipt(userId, purchase, receipt, latestReceipt) {
+  try {
+    await admin.firestore().collection("receipts").add({
+      userId,
+      productId: purchase.product_id,
+      transactionId: purchase.transaction_id,
+      originalTransactionId: purchase.original_transaction_id,
+      purchaseDate: new Date(parseInt(purchase.purchase_date_ms)),
+      expiresDate: purchase.expires_date_ms ? new Date(parseInt(purchase.expires_date_ms)) : null,
+      validatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      environment: receipt.receipt_creation_date_ms ? "production" : "sandbox",
+      bundleId: receipt.bundle_id,
+      latestReceipt: latestReceipt, // Store for future validations
+      isActive: true,
+    });
+
+    console.log(`Stored receipt for transaction ${purchase.transaction_id}`);
+  } catch (error) {
+    console.error("Error storing receipt:", error);
+    // Don't throw here, as the purchase was already granted
+  }
+}
+
+// Handle expired subscriptions
+async function handleExpiredSubscription(userId, purchase) {
+  try {
+    await admin.firestore().collection("users").doc(userId).update({
+      isPremium: false,
+      premiumExpiredAt: admin.firestore.FieldValue.serverTimestamp(),
+      lastExpiredProductId: purchase.product_id,
+    });
+
+    console.log(`Marked subscription as expired for user ${userId}`);
+  } catch (error) {
+    console.error("Error handling expired subscription:", error);
+  }
+}
+
+// Handle pending renewal info
+async function handlePendingRenewal(userId, renewalInfo) {
+  try {
+    const updates = {
+      autoRenewStatus: renewalInfo.auto_renew_status === "1",
+      autoRenewProductId: renewalInfo.auto_renew_product_id,
+    };
+
+    if (renewalInfo.expiration_intent) {
+      updates.expirationIntent = getExpirationIntent(renewalInfo.expiration_intent);
+    }
+
+    await admin.firestore().collection("users").doc(userId).update(updates);
+
+    console.log(`Updated renewal info for user ${userId}`);
+  } catch (error) {
+    console.error("Error handling pending renewal:", error);
+  }
+}
+
+// Helper functions
+function getBoostCount(productId) {
+  if (productId.includes("1pack")) return 1;
+  if (productId.includes("5pack")) return 5;
+  if (productId.includes("10pack")) return 10;
+  return 0;
+}
+
+function getSuperLikeCount(productId) {
+  if (productId.includes("5pack")) return 5;
+  if (productId.includes("15pack")) return 15;
+  if (productId.includes("30pack")) return 30;
+  return 0;
+}
+
+function getStatusMessage(status) {
+  const statusMessages = {
+    21000: "App Store could not read the JSON object",
+    21002: "Receipt data is malformed",
+    21003: "Receipt could not be authenticated",
+    21004: "Shared secret does not match",
+    21005: "Receipt server is not currently available",
+    21006: "Receipt is valid but subscription has expired",
+    21007: "Receipt is from sandbox environment",
+    21008: "Receipt is from production environment",
+    21009: "Internal data access error",
+    21010: "User account not found",
+  };
+
+  return statusMessages[status] || "Unknown error";
+}
+
+function getExpirationIntent(intent) {
+  const intents = {
+    "1": "Customer cancelled",
+    "2": "Billing error",
+    "3": "Customer declined price increase",
+    "4": "Product not available",
+    "5": "Unknown error",
+  };
+
+  return intents[intent] || "Unknown";
+}
+
+// Function to restore purchases
+exports.restorePurchases = onCall(async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "User must be authenticated");
+  }
+
+  const userId = request.auth.uid;
+  const {receiptData} = request.data;
+
+  if (!receiptData) {
+    throw new functions.https.HttpsError("invalid-argument", "Receipt data is required");
+  }
+
+  console.log(`Restoring purchases for user ${userId}`);
+
+  try {
+    // Validate the receipt
+    let response = await validateWithApple(APPLE_PRODUCTION_URL, receiptData);
+
+    if (response.data.status === 21007) {
+      response = await validateWithApple(APPLE_SANDBOX_URL, receiptData);
+    }
+
+    const validationResult = response.data;
+
+    if (validationResult.status !== 0) {
+      throw new functions.https.HttpsError(
+        "invalid-argument",
+        `Invalid receipt: ${getStatusMessage(validationResult.status)}`,
+      );
+    }
+
+    const latestReceiptInfo = validationResult.latest_receipt_info || [];
+    const restoredPurchases = [];
+
+    // Process all purchases in the receipt
+    for (const purchase of latestReceiptInfo) {
+      console.log(`Restoring purchase: ${purchase.product_id}`);
+
+      // Only restore active subscriptions and consumables
+      const expiresDateMs = purchase.expires_date_ms ? parseInt(purchase.expires_date_ms) : null;
+      const isActiveSubscription = !expiresDateMs || expiresDateMs > Date.now();
+
+      if (isActiveSubscription || !purchase.product_id.includes("premium")) {
+        await grantPurchase(userId, purchase);
+        restoredPurchases.push({
+          productId: purchase.product_id,
+          transactionId: purchase.transaction_id,
+          expiresDate: expiresDateMs ? new Date(expiresDateMs) : null,
+        });
+      }
+    }
+
+    console.log(`Restored ${restoredPurchases.length} purchases for user ${userId}`);
+
+    return {
+      success: true,
+      restoredPurchases,
+    };
+  } catch (error) {
+    console.error("Error restoring purchases:", error);
+
+    if (error instanceof functions.https.HttpsError) {
+      throw error;
+    }
+
+    throw new functions.https.HttpsError("internal", "Failed to restore purchases");
+  }
+});
+
+// Webhook for subscription status updates (optional but recommended)
+exports.handleAppleWebhook = functions.https.onRequest(async (req, res) => {
+  // Verify the request is from Apple (implement your own verification)
+  // Apple Server Notifications for auto-renewable subscriptions
+
+  try {
+    const notification = req.body;
+
+    if (!notification || !notification.unified_receipt) {
+      res.status(400).send("Invalid notification");
+      return;
+    }
+
+    console.log("Received Apple webhook notification:", notification.notification_type);
+
+    // Handle different notification types
+    switch (notification.notification_type) {
+    case "RENEWAL":
+    case "INTERACTIVE_RENEWAL":
+    case "DID_RECOVER":
+      // Process renewal
+      await processRenewal(notification);
+      break;
+
+    case "CANCEL":
+    case "DID_FAIL_TO_RENEW":
+    case "REFUND":
+      // Handle cancellation/refund
+      await processCancellation(notification);
+      break;
+    }
+
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error("Error processing Apple webhook:", error);
+    res.status(500).send("Internal error");
+  }
+});
 
 exports.generateAgoraToken = onCall(async (request) => {
   // Verify user is authenticated

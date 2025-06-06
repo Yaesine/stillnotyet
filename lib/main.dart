@@ -16,6 +16,7 @@ import 'package:new_tinder_clone/screens/splash_screen.dart';
 import 'package:new_tinder_clone/screens/terms_of_service_screen.dart';
 import 'package:new_tinder_clone/screens/theme_settings_screen.dart';
 import 'package:new_tinder_clone/screens/video_call_screen.dart';
+import 'package:new_tinder_clone/services/purchase_service.dart';
 import 'package:new_tinder_clone/widgets/FCMTokenFixer.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -81,6 +82,10 @@ void main() async {
     // Initialize notification manager
     final notificationManager = NotificationManager();
     await notificationManager.initialize();
+
+    final purchaseService = PurchaseService();
+    await purchaseService.initialize();
+
   } catch (e) {
     print('Error initializing Firebase: $e');
   }
@@ -183,6 +188,8 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => MessageProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => PurchaseService()),
+
       ],
       child: ThemeSystemListener(
         child: Consumer<ThemeProvider>(
