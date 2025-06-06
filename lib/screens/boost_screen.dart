@@ -4,6 +4,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import '../theme/app_theme.dart';
 import '../widgets/components/app_button.dart';
 import '../services/purchase_service.dart';
+import '../services/boost_service.dart';
 import '../widgets/components/loading_indicator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,9 +16,13 @@ class BoostScreen extends StatefulWidget {
 
 class _BoostScreenState extends State<BoostScreen> {
   final PurchaseService _purchaseService = PurchaseService();
+  final BoostService _boostService = BoostService();
   bool _isProcessingPurchase = false;
+  bool _isActivatingBoost = false;
   int _currentBoosts = 0;
   bool _isLoadingUserData = true;
+  bool _hasActiveBoost = false;
+  int _remainingBoostTime = 0;
 
   @override
   void initState() {
@@ -29,6 +34,7 @@ class _BoostScreenState extends State<BoostScreen> {
     await Future.wait([
       _purchaseService.initialize(),
       _loadCurrentBoosts(),
+      _checkActiveBoost(),
     ]);
     if (mounted) {
       setState(() {
@@ -38,17 +44,22 @@ class _BoostScreenState extends State<BoostScreen> {
   }
 
   Future<void> _loadCurrentBoosts() async {
-    final userId = FirebaseAuth.instance.currentUser?.uid;
-    if (userId != null) {
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .get();
-      if (userDoc.exists && mounted) {
-        setState(() {
-          _currentBoosts = userDoc.data()?['availableBoosts'] ?? 0;
-        });
-      }
+    final boosts = await _boostService.getAvailableBoosts();
+    if (mounted) {
+      setState(() {
+        _currentBoosts = boosts;
+      });
+    }
+  }
+
+  Future<void> _checkActiveBoost() async {
+    final hasActiveBoost = await _boostService.hasActiveBoost();
+    final remainingTime = await _boostService.getRemainingBoostTime();
+    if (mounted) {
+      setState(() {
+        _hasActiveBoost = hasActiveBoost;
+        _remainingBoostTime = remainingTime;
+      });
     }
   }
 
@@ -85,6 +96,59 @@ class _BoostScreenState extends State<BoostScreen> {
       if (mounted) {
         setState(() {
           _isProcessingPurchase = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _activateBoost() async {
+    if (_isActivatingBoost || _currentBoosts <= 0) return;
+
+    setState(() {
+      _isActivatingBoost = true;
+    });
+
+    try {
+      final success = await _boostService.activateBoost();
+
+      if (success) {
+        await _loadCurrentBoosts();
+        await _checkActiveBoost();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Boost activated! Your profile will be prioritized for 30 minutes.'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not activate boost. Please try again.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error activating boost: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isActivatingBoost = false;
         });
       }
     }
@@ -229,6 +293,72 @@ class _BoostScreenState extends State<BoostScreen> {
                         ),
                       ),
                       SizedBox(height: 48),
+
+                      // Active boost status
+                      if (_hasActiveBoost)
+                        Container(
+                          margin: EdgeInsets.symmetric(horizontal: 32),
+                          padding: EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.green.withOpacity(0.5),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.timer, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text(
+                                'Boost active for $_remainingBoostTime minutes',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (_currentBoosts > 0)
+                      // Activate boost button
+                        ElevatedButton(
+                          onPressed: _isActivatingBoost ? null : _activateBoost,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                          ),
+                          child: _isActivatingBoost
+                              ? SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            ),
+                          )
+                              : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.flash_on),
+                              SizedBox(width: 8),
+                              Text(
+                                'Activate Boost',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                      SizedBox(height: 24),
 
                       // Show loading or purchase options
                       if (_purchaseService.isLoading)

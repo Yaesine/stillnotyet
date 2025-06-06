@@ -19,6 +19,8 @@ import 'boost_screen.dart';
 import 'streak_screen.dart';
 import '../utils/custom_page_route.dart';
 import '../widgets/user_profile_detail.dart' as widget_profile;
+import '../services/boost_service.dart';
+import 'dart:async';
 
 class EnhancedHomeScreen extends StatefulWidget {
   const EnhancedHomeScreen({Key? key}) : super(key: key);
@@ -36,6 +38,12 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
   // Added for enhanced UI/UX
   final GlobalKey<RefreshIndicatorState> _refreshIndicatorKey = GlobalKey<RefreshIndicatorState>();
 
+  // Add these variables to the state class
+  final BoostService _boostService = BoostService();
+  bool _hasActiveBoost = false;
+  int _remainingBoostTime = 0;
+  Timer? _boostTimer;
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +55,54 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
 
     // Load potential matches when screen initializes
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadMatches();
+      _initializeScreen();
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _boostTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initializeScreen() async {
+    await Future.wait([
+      _loadMatches(),
+      _checkActiveBoost(),
+    ]);
+  }
+
+  Future<void> _checkActiveBoost() async {
+    final hasActiveBoost = await _boostService.hasActiveBoost();
+    final remainingTime = await _boostService.getRemainingBoostTime();
+
+    if (mounted) {
+      setState(() {
+        _hasActiveBoost = hasActiveBoost;
+        _remainingBoostTime = remainingTime;
+      });
+    }
+
+    // Start timer to update remaining time
+    if (hasActiveBoost) {
+      _startBoostTimer();
+    }
+  }
+
+  void _startBoostTimer() {
+    _boostTimer?.cancel();
+    _boostTimer = Timer.periodic(Duration(minutes: 1), (timer) async {
+      final remainingTime = await _boostService.getRemainingBoostTime();
+      if (mounted) {
+        setState(() {
+          _remainingBoostTime = remainingTime;
+          if (remainingTime <= 0) {
+            _hasActiveBoost = false;
+            timer.cancel();
+          }
+        });
+      }
     });
   }
 
@@ -234,12 +289,6 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
     }
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
   // Show user profile detail - using the widget version
   void _showUserProfile(User user) {
     // Track profile view and navigate to detail screen
@@ -250,12 +299,6 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
       ),
     );
   }
-
-  // Add this to your EnhancedHomeScreen class in lib/screens/enhanced_home_screen.dart
-
-// Add these imports at the top of your file:
-// import 'package:firebase_auth/firebase_auth.dart' as auth;
-// import 'package:new_tinder_clone/models/user_model.dart' as app_models;
 
   void _handleRewind() async {
     if (_isActionInProgress) return;
@@ -523,59 +566,113 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
           ),
         ],
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // Rewind button (could be premium feature)
-          SwipeActionButton(
-            icon: Icons.replay,
-            color: Colors.amber,
-            onTap: _handleRewind,  // Updated to use our rewind handler
-            size: 44,
-          ),
+          // Boost status indicator
+          if (_hasActiveBoost)
+            Container(
+              margin: EdgeInsets.only(bottom: 12),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.green.withOpacity(0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer, color: Colors.green, size: 16),
+                  SizedBox(width: 4),
+                  Text(
+                    'Boost active for $_remainingBoostTime minutes',
+                    style: TextStyle(
+                      color: Colors.green,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // Rewind button
+              SwipeActionButton(
+                icon: Icons.replay,
+                color: Colors.amber,
+                onTap: _handleRewind,
+                size: 44,
+              ),
 
+              // Dislike button
+              SwipeActionButton(
+                icon: Icons.close,
+                color: Colors.red,
+                onTap: () => _handleSwipeLeft(userId),
+                size: 64,
+              ),
 
-          // Dislike button
-          SwipeActionButton(
-            icon: Icons.close,
-            color: Colors.red,
-            onTap: () => _handleSwipeLeft(userId),
-            size: 64,
-          ),
+              // Super like button
+              SwipeActionButton(
+                icon: Icons.star,
+                color: Colors.blue,
+                onTap: () => _handleSuperLike(userId),
+                isSuper: true,
+                size: 54,
+              ),
 
-          // Super like button
-          SwipeActionButton(
-            icon: Icons.star,
-            color: Colors.blue,
-            onTap: () => _handleSuperLike(userId),
-            isSuper: true,
-            size: 54,
-          ),
+              // Like button
+              SwipeActionButton(
+                icon: Icons.favorite,
+                color: AppColors.primary,
+                onTap: () => _handleSwipeRight(userId),
+                size: 64,
+              ),
 
-          // Like button
-          SwipeActionButton(
-            icon: Icons.favorite,
-            color: AppColors.primary,
-            onTap: () => _handleSwipeRight(userId),
-            size: 64,
-          ),
-
-          // Boost button
-          SwipeActionButton(
-            icon: Icons.bolt,
-            color: Colors.purple,
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => BoostScreen()),
-              );
-            },
-            size: 44,
+              // Boost button
+              SwipeActionButton(
+                icon: Icons.bolt,
+                color: Colors.purple,
+                onTap: () async {
+                  final availableBoosts = await _boostService.getAvailableBoosts();
+                  if (availableBoosts > 0) {
+                    final success = await _boostService.activateBoost();
+                    if (success) {
+                      await _checkActiveBoost();
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Boost activated! Your profile will be prioritized for 30 minutes.'),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Could not activate boost. Please try again.'),
+                          backgroundColor: Colors.red,
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  } else {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => BoostScreen()),
+                    );
+                  }
+                },
+                size: 44,
+              ),
+            ],
           ),
         ],
       ),
     );
   }
-
 
   Widget _buildSwipeCardStack(List<User> profiles) {
     // Create visual depth with decorative containers that won't interfere with gestures
@@ -730,10 +827,33 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
                 SwipeActionButton(
                   icon: Icons.bolt,
                   color: Colors.purple,
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => BoostScreen()),
-                    );
+                  onTap: () async {
+                    final availableBoosts = await _boostService.getAvailableBoosts();
+                    if (availableBoosts > 0) {
+                      final success = await _boostService.activateBoost();
+                      if (success) {
+                        await _checkActiveBoost();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Boost activated! Your profile will be prioritized for 30 minutes.'),
+                            backgroundColor: Colors.green,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Could not activate boost. Please try again.'),
+                            backgroundColor: Colors.red,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    } else {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => BoostScreen()),
+                      );
+                    }
                   },
                   size: 44,
                 ),
@@ -746,8 +866,6 @@ class _EnhancedHomeScreenState extends State<EnhancedHomeScreen> with SingleTick
 
     return Stack(children: stackChildren);
   }
-
-
 
   // NEW: Swipe instruction overlay
   Widget _buildSwipeInstructions() {
