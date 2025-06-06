@@ -33,6 +33,7 @@ import 'services/firestore_service.dart';
 import 'services/location_service.dart';
 import 'services/notification_manager.dart';
 import 'services/notifications_service.dart';
+import 'services/gold_plus_service.dart';
 
 // Screens
 import 'screens/enhanced_home_screen.dart';
@@ -189,7 +190,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MessageProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => PurchaseService()),
-
+        ChangeNotifierProvider(create: (_) => GoldPlusService()),
       ],
       child: ThemeSystemListener(
         child: Consumer<ThemeProvider>(
