@@ -3,23 +3,21 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>1075080846660-fehqn2upmf9ktd5v2or4g987ecqu3rej.apps.googleusercontent.com</string>
+	<string>395654341992-6pc2h2pmpou2fg59q5lpbv1g1lp6f7gv.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1075080846660-fehqn2upmf9ktd5v2or4g987ecqu3rej</string>
-	<key>ANDROID_CLIENT_ID</key>
-	<string>1075080846660-q2bseqsgi407q7lo1pa3jomtsssrsf0i.apps.googleusercontent.com</string>
+	<string>com.googleusercontent.apps.395654341992-6pc2h2pmpou2fg59q5lpbv1g1lp6f7gv</string>
 	<key>API_KEY</key>
-	<string>AIzaSyAOk-PEqieOaJ5O7RXEI8_lfBMQw5KJksI</string>
+	<string>AIzaSyC9uen8hB47r0X0gkyfIXgfMmjvGSSOTwM</string>
 	<key>GCM_SENDER_ID</key>
-	<string>1075080846660</string>
+	<string>395654341992</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.ycheqrouni.newtinderclone</string>
+	<string>com.marifecto.datechatmeet</string>
 	<key>PROJECT_ID</key>
-	<string>tinderclones-4f4c4</string>
+	<string>marifecto</string>
 	<key>STORAGE_BUCKET</key>
-	<string>tinderclones-4f4c4.firebasestorage.app</string>
+	<string>marifecto.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -31,8 +29,8 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1075080846660:ios:613de45ee4399153d70b11</string>
+	<string>1:395654341992:ios:9cf166dfe7ee0df08022dd</string>
 	<key>DATABASE_URL</key>
-	<string>https://tinderclones-4f4c4-default-rtdb.firebaseio.com</string>
+	<string>https://marifecto-default-rtdb.firebaseio.com</string>
 </dict>
 </plist>
