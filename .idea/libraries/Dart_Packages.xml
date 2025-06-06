@@ -453,14 +453,14 @@
         <entry key="in_app_purchase">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase-3.2.3/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase-3.1.11/lib" />
             </list>
           </value>
         </entry>
         <entry key="in_app_purchase_android">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_android-0.4.0+2/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_android-0.3.6+13/lib" />
             </list>
           </value>
         </entry>
@@ -474,7 +474,7 @@
         <entry key="in_app_purchase_storekit">
           <value>
             <list>
-              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_storekit-0.4.1/lib" />
+              <option value="$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_storekit-0.3.6/lib" />
             </list>
           </value>
         </entry>
@@ -1046,10 +1046,10 @@
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/image_picker_macos-0.2.1+2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/image_picker_platform_interface-2.10.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/image_picker_windows-0.2.1+1/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase-3.2.3/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_android-0.4.0+2/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase-3.1.11/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_android-0.3.6+13/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_platform_interface-1.4.0/lib" />
-      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_storekit-0.4.1/lib" />
+      <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/in_app_purchase_storekit-0.3.6/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/intl-0.18.1/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/iris_method_channel-2.2.2/lib" />
       <root url="file://$USER_HOME$/.pub-cache/hosted/pub.dev/js-0.6.7/lib" />
