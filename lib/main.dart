@@ -681,11 +681,13 @@ class _MainScreenState extends State<MainScreen> {
           backgroundColor: isDarkMode
               ? AppColors.darkSurface
               : Colors.white,
-          iconSize: 28, // Increased icon size
+          iconSize: 28, // Base icon size for all icons
           items: [
             // Discover tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Container(
+              icon: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -700,16 +702,27 @@ class _MainScreenState extends State<MainScreen> {
                   )
                       : null,
                 ),
-                child: Icon(
-                  Icons.whatshot_rounded,
-                  size: _currentIndex == 0 ? 32 : 28,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 200),
+                  scale: _currentIndex == 0 ? 1.2 : 1.0,
+                  child: Icon(
+                    Icons.whatshot_rounded,
+                    size: 28,
+                    color: _currentIndex == 0
+                        ? AppColors.primary
+                        : isDarkMode
+                        ? AppColors.darkTextSecondary.withOpacity(0.7)
+                        : Colors.grey.withOpacity(0.8),
+                  ),
                 ),
               ),
               label: '',
             ),
             // Explore tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Container(
+              icon: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -724,16 +737,27 @@ class _MainScreenState extends State<MainScreen> {
                   )
                       : null,
                 ),
-                child: Icon(
-                  Icons.explore_rounded,
-                  size: _currentIndex == 1 ? 32 : 28,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 200),
+                  scale: _currentIndex == 1 ? 1.2 : 1.0,
+                  child: Icon(
+                    Icons.explore_rounded,
+                    size: 28,
+                    color: _currentIndex == 1
+                        ? Colors.purple
+                        : isDarkMode
+                        ? AppColors.darkTextSecondary.withOpacity(0.7)
+                        : Colors.grey.withOpacity(0.8),
+                  ),
                 ),
               ),
               label: '',
             ),
             // Video Call tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Container(
+              icon: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -748,16 +772,27 @@ class _MainScreenState extends State<MainScreen> {
                   )
                       : null,
                 ),
-                child: Icon(
-                  Icons.video_call_rounded,
-                  size: _currentIndex == 2 ? 32 : 28,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 200),
+                  scale: _currentIndex == 2 ? 1.2 : 1.0,
+                  child: Icon(
+                    Icons.video_call_rounded,
+                    size: 28,
+                    color: _currentIndex == 2
+                        ? Colors.green
+                        : isDarkMode
+                        ? AppColors.darkTextSecondary.withOpacity(0.7)
+                        : Colors.grey.withOpacity(0.8),
+                  ),
                 ),
               ),
               label: '',
             ),
             // Likes tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Container(
+              icon: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -774,9 +809,18 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 child: Stack(
                   children: [
-                    Icon(
-                      Icons.favorite_rounded,
-                      size: _currentIndex == 3 ? 32 : 28,
+                    AnimatedScale(
+                      duration: const Duration(milliseconds: 200),
+                      scale: _currentIndex == 3 ? 1.2 : 1.0,
+                      child: Icon(
+                        Icons.favorite_rounded,
+                        size: 28,
+                        color: _currentIndex == 3
+                            ? Colors.pink
+                            : isDarkMode
+                            ? AppColors.darkTextSecondary.withOpacity(0.7)
+                            : Colors.grey.withOpacity(0.8),
+                      ),
                     ),
                     // Optional: Add a notification badge
                     if (false) // Replace with actual condition for new likes
@@ -803,7 +847,9 @@ class _MainScreenState extends State<MainScreen> {
             ),
             // Matches/Chat tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Container(
+              icon: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -820,9 +866,18 @@ class _MainScreenState extends State<MainScreen> {
                 ),
                 child: Stack(
                   children: [
-                    Icon(
-                      Icons.chat_bubble_rounded,
-                      size: _currentIndex == 4 ? 32 : 28,
+                    AnimatedScale(
+                      duration: const Duration(milliseconds: 200),
+                      scale: _currentIndex == 4 ? 1.2 : 1.0,
+                      child: Icon(
+                        Icons.chat_bubble_rounded,
+                        size: 28,
+                        color: _currentIndex == 4
+                            ? Colors.blue
+                            : isDarkMode
+                            ? AppColors.darkTextSecondary.withOpacity(0.7)
+                            : Colors.grey.withOpacity(0.8),
+                      ),
                     ),
                     // Optional: Add a notification badge for unread messages
                     if (false) // Replace with actual condition for unread messages
@@ -849,7 +904,9 @@ class _MainScreenState extends State<MainScreen> {
             ),
             // Profile tab with enhanced icon
             BottomNavigationBarItem(
-              icon: Container(
+              icon: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
@@ -864,9 +921,18 @@ class _MainScreenState extends State<MainScreen> {
                   )
                       : null,
                 ),
-                child: Icon(
-                  Icons.person_rounded,
-                  size: _currentIndex == 5 ? 32 : 28,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 200),
+                  scale: _currentIndex == 5 ? 1.2 : 1.0,
+                  child: Icon(
+                    Icons.person_rounded,
+                    size: 28,
+                    color: _currentIndex == 5
+                        ? Colors.orange
+                        : isDarkMode
+                        ? AppColors.darkTextSecondary.withOpacity(0.7)
+                        : Colors.grey.withOpacity(0.8),
+                  ),
                 ),
               ),
               label: '',

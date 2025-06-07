@@ -18,7 +18,7 @@ class PurchaseService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Product IDs (must match App Store Connect)
-  static const String kPremiumMonthly = 'com.marifecto.premium.monthly';
+  static const String kPremiumMonthly = 'com.marifecto.datechatmeet.prem.monthly';
   static const String kPremium3Months = 'com.marifecto.premium.3months';
   static const String kPremium6Months = 'com.marifecto.premium.6months';
   static const String kBoost1Pack = 'com.marifecto.boost.1pack';

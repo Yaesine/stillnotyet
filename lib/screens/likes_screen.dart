@@ -368,42 +368,7 @@ class _LikesScreenState extends State<LikesScreen> with SingleTickerProviderStat
           ),
 
           // Call Tab
-          Expanded(
-            child: GestureDetector(
-              onTap: () {
-                _tabController.animateTo(2);
-              },
-              child: Center(
-                child: Container(
-                  // Make colored indicator taller but not full height
-                  height: 48, // Taller than text but not full container height
-                  width: double.infinity, // Make it fill the width
-                  decoration: BoxDecoration(
-                    color: _tabController.index == 2 ? selectedBgColor : Colors.transparent,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        _tabController.index == 2 ? Icons.video_call : Icons.video_call_outlined,
-                        color: _tabController.index == 2 ? selectedTextColor : unselectedTextColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Call',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: _tabController.index == 2 ? selectedTextColor : unselectedTextColor,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+
         ],
       ),
     );

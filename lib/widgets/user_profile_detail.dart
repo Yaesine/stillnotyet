@@ -15,6 +15,7 @@ import '../screens/premium_screen.dart';
 import '../utils/profile_options.dart';
 import 'components/letter_avatar.dart';
 import 'components/interest_chip.dart';
+import '../services/block_service.dart';
 
 class UserProfileDetail extends StatefulWidget {
   final User user;
@@ -179,29 +180,16 @@ class _UserProfileDetailState extends State<UserProfileDetail>
                       ),
                     ],
                   ),
-                  child: FutureBuilder<bool>(
-                    future: _checkIfMatched(),
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      }
-
-                      final isMatched = snapshot.data ?? false;
-
-                      return SizedBox(
-                        width: double.infinity,
+                  child: Row(
+                    children: [
+                      Expanded(
                         child: ElevatedButton.icon(
-                          onPressed: () => _handleSendMessage(context, isMatched),
-                          icon: Icon(Icons.message, size: 20),
-                          label: const Text(
-                            'Send Message',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          onPressed: () async {
+                            final isMatched = await _checkIfMatched();
+                            _handleSendMessage(context, isMatched);
+                          },
+                          icon: const Icon(Icons.message_rounded),
+                          label: const Text('Send Message'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
@@ -209,11 +197,11 @@ class _UserProfileDetailState extends State<UserProfileDetail>
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(30),
                             ),
-                            elevation: 3,
                           ),
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(width: 12),
+                    ],
                   ),
                 ),
               ),
@@ -584,105 +572,292 @@ class _UserProfileDetailState extends State<UserProfileDetail>
           top: 20,
           bottom: MediaQuery.of(context).padding.bottom + 20,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDarkMode ? AppColors.darkDivider : Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Title
-            Text(
-              'Report ${widget.user.name}',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Help us understand what\'s happening',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Report options
-            _buildReportOption(
-              context: context,
-              icon: Icons.photo_camera,
-              title: 'Inappropriate photos',
-              description: 'Profile contains nudity or sexual content',
-              reason: 'inappropriate_photos',
-            ),
-            _buildReportOption(
-              context: context,
-              icon: Icons.person_off,
-              title: 'Fake profile',
-              description: 'This person is pretending to be someone else',
-              reason: 'fake_profile',
-            ),
-            _buildReportOption(
-              context: context,
-              icon: Icons.warning,
-              title: 'Scam or spam',
-              description: 'Asking for money or promoting services',
-              reason: 'scam',
-            ),
-            _buildReportOption(
-              context: context,
-              icon: Icons.message,
-              title: 'Offensive messages',
-              description: 'Sent inappropriate or harassing messages',
-              reason: 'offensive_messages',
-            ),
-            _buildReportOption(
-              context: context,
-              icon: Icons.child_care,
-              title: 'Under 18',
-              description: 'This person appears to be underage',
-              reason: 'underage',
-            ),
-            _buildReportOption(
-              context: context,
-              icon: Icons.more_horiz,
-              title: 'Other',
-              description: 'Something else is wrong with this profile',
-              reason: 'other',
-            ),
-
-            const SizedBox(height: 16),
-
-            // Cancel button
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Center(
-                child: Text(
-                  'Cancel',
-                  style: TextStyle(
-                    color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
-                    fontSize: 16,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDarkMode ? AppColors.darkDivider : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+
+              // Title
+              Text(
+                'Report ${widget.user.name}',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Help us understand what\'s happening',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Report options
+              _buildReportOption(
+                context: context,
+                icon: Icons.photo_camera,
+                title: 'Inappropriate photos',
+                description: 'Profile contains nudity or sexual content',
+                reason: 'inappropriate_photos',
+              ),
+              _buildReportOption(
+                context: context,
+                icon: Icons.person_off,
+                title: 'Fake profile',
+                description: 'This person is pretending to be someone else',
+                reason: 'fake_profile',
+              ),
+              _buildReportOption(
+                context: context,
+                icon: Icons.warning,
+                title: 'Scam or spam',
+                description: 'Asking for money or promoting services',
+                reason: 'scam',
+              ),
+              _buildReportOption(
+                context: context,
+                icon: Icons.message,
+                title: 'Offensive messages',
+                description: 'Sent inappropriate or harassing messages',
+                reason: 'offensive_messages',
+              ),
+              _buildReportOption(
+                context: context,
+                icon: Icons.child_care,
+                title: 'Under 18',
+                description: 'This person appears to be underage',
+                reason: 'underage',
+              ),
+              _buildReportOption(
+                context: context,
+                icon: Icons.more_horiz,
+                title: 'Other',
+                description: 'Something else is wrong with this profile',
+                reason: 'other',
+              ),
+
+              const SizedBox(height: 16),
+
+              // Block user option
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => _handleBlockUser(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 4),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: Colors.red.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              Icons.block,
+                              color: Colors.red,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Block User',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.red,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Block this user and remove them from your matches',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.chevron_right,
+                            color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // Cancel button
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Center(
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  void _handleBlockUser(BuildContext context) async {
+    // Close the report dialog
+    Navigator.pop(context);
+
+    // Show confirmation dialog
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final bool? shouldBlock = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: isDarkMode ? AppColors.darkCard : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              Icon(Icons.block, color: Colors.red, size: 28),
+              const SizedBox(width: 12),
+              Text(
+                'Block User',
+                style: TextStyle(
+                  color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to block ${widget.user.name}?',
+                style: TextStyle(
+                  color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.red, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This will remove them from your matches and prevent them from contacting you',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(
+                  color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Block User'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldBlock == true) {
+      try {
+        final blockService = BlockService();
+        await blockService.blockUser(widget.user);
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${widget.user.name} has been blocked'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+          Navigator.pop(context); // Return to previous screen
+        }
+      } catch (e) {
+        print('Error blocking user: $e');
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Failed to block user. Please try again.'),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildReportOption({
@@ -1349,6 +1524,65 @@ class _UserProfileDetailState extends State<UserProfileDetail>
               fontSize: 15,
               height: 1.4,
               color: isDarkMode ? AppColors.darkTextPrimary : AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showBlockConfirmation(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Block User'),
+        content: Text(
+          'Are you sure you want to block ${widget.user.name}? You won\'t be able to see their profile or receive messages from them.',
+          style: TextStyle(
+            color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(
+                color: isDarkMode ? AppColors.darkTextSecondary : AppColors.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await BlockService().blockUser(widget.user);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${widget.user.name} has been blocked'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                  Navigator.pop(context); // Return to previous screen
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Failed to block user'),
+                      backgroundColor: Colors.red,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              }
+            },
+            child: const Text(
+              'Block',
+              style: TextStyle(color: Colors.red),
             ),
           ),
         ],

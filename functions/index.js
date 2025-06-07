@@ -11,7 +11,7 @@ admin.initializeApp();
 // Constants for product IDs
 const PRODUCT_IDS = {
   PREMIUM: {
-    MONTHLY: "com.marifecto.premium.monthly",
+    MONTHLY: "com.marifecto.datechatmeet.prem.monthly",
     THREE_MONTHS: "com.marifecto.premium.3months",
     SIX_MONTHS: "com.marifecto.premium.6months",
   },

@@ -1,7 +1,9 @@
-// lib/services/fake_video_call_service.dart - Updated with working video URLs
+// lib/services/fake_video_call_service.dart - Updated to load videos from Google Drive
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/user_model.dart' as app_models;
@@ -13,47 +15,95 @@ class FakeVideoCallService {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final Random _random = Random();
+  List<FakeVideoData> _fakeVideos = [];
+  bool _isInitialized = false;
 
-  final List<FakeVideoData> _fakeVideos = [
-    FakeVideoData(
-      videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131937/Video_Ready_Enthusiastic_Young_Woman_1_xvqma6.mp4',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=500&auto=format&fit=crop&q=60',
-      duration: Duration(minutes: 1),
-      user: FakeUserData(
-        name: 'Emma',
-        age: 24,
-        location: 'New York',
-        interests: ['Travel', 'Photography', 'Coffee'],
+  // Google Drive file ID for the JSON file
+  static const String _jsonFileId = '1SJMkNgjNh7bOdkGnFin2ZiMBrnq3Sc-X';
+  static const String _jsonFileUrl = 'https://drive.google.com/uc?export=download&id=$_jsonFileId';
+
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+
+    try {
+      // Fetch the JSON file from Google Drive
+      final response = await http.get(Uri.parse(_jsonFileUrl));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonData = json.decode(response.body);
+
+        // Convert JSON data to FakeVideoData objects
+        _fakeVideos = (jsonData['videos'] as List).map((videoJson) {
+          return FakeVideoData(
+            videoUrl: videoJson['videoUrl'],
+            thumbnailUrl: videoJson['thumbnailUrl'],
+            duration: Duration(seconds: videoJson['duration']),
+            user: FakeUserData(
+              name: videoJson['user']['name'],
+              age: videoJson['user']['age'],
+              location: videoJson['user']['location'],
+              interests: List<String>.from(videoJson['user']['interests']),
+            ),
+          );
+        }).toList();
+
+        _isInitialized = true;
+        print('✅ Fake video data loaded successfully from Google Drive: ${_fakeVideos.length} videos');
+      } else {
+        print('❌ Failed to load JSON file from Google Drive: ${response.statusCode}');
+     //   _initializeFallbackData();
+      }
+    } catch (e) {
+      print('❌ Error loading fake video data from Google Drive: $e');
+      //_initializeFallbackData();
+    }
+  }
+
+  void _initializeFallbackData() {
+    _fakeVideos = [
+      FakeVideoData(
+        videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131937/Video_Ready_Enthusiastic_Young_Woman_1_xvqma6.mp4',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=500&auto=format&fit=crop&q=60',
+        duration: Duration(minutes: 1),
+        user: FakeUserData(
+          name: 'Emma',
+          age: 24,
+          location: 'New York',
+          interests: ['Travel', 'Photography', 'Coffee'],
+        ),
       ),
-    ),
-    FakeVideoData(
-      videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131931/Video_Generation_Young_Woman_Chat_1_bvphzc.mp4',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&auto=format&fit=crop&q=60',
-      duration: Duration(minutes: 1),
-      user: FakeUserData(
-        name: 'Sarah',
-        age: 26,
-        location: 'London',
-        interests: ['Art', 'Music', 'Cooking'],
+      FakeVideoData(
+        videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131931/Video_Generation_Young_Woman_Chat_1_bvphzc.mp4',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500&auto=format&fit=crop&q=60',
+        duration: Duration(minutes: 1),
+        user: FakeUserData(
+          name: 'Sarah',
+          age: 26,
+          location: 'London',
+          interests: ['Art', 'Music', 'Cooking'],
+        ),
       ),
-    ),
-    FakeVideoData(
-      videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131814/Video_Request_Silent_Vlog_1_hqlwnt.mp4',
-      thumbnailUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500&auto=format&fit=crop&q=60',
-      duration: Duration(minutes: 1, seconds: 30),
-      user: FakeUserData(
-        name: 'Jessica',
-        age: 28,
-        location: 'Paris',
-        interests: ['Fitness', 'Movies', 'Dancing'],
+      FakeVideoData(
+        videoUrl: 'https://res.cloudinary.com/do5u0hen5/video/upload/v1749131814/Video_Request_Silent_Vlog_1_hqlwnt.mp4',
+        thumbnailUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500&auto=format&fit=crop&q=60',
+        duration: Duration(minutes: 1, seconds: 30),
+        user: FakeUserData(
+          name: 'Jessica',
+          age: 28,
+          location: 'Paris',
+          interests: ['Fitness', 'Movies', 'Dancing'],
+        ),
       ),
-    ),
-
-
-  ];
-
+    ];
+    _isInitialized = true;
+    print('⚠️ Using fallback fake video data');
+  }
 
   FakeVideoData getRandomFakeVideo() {
+    if (!_isInitialized) {
+      print('⚠️ FakeVideoCallService not initialized, initializing now...');
+      initialize();
+    }
     return _fakeVideos[_random.nextInt(_fakeVideos.length)];
   }
 

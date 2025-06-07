@@ -112,12 +112,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
         ),
         'adminGrantedAt': FieldValue.serverTimestamp(),
         'adminPremiumFeatures': [
-          'unlimited_likes',
+          'unlimited_swipes',
           'see_who_likes_you',
+          'see_profile_visitors',
           'super_likes',
           'rewind',
-          'boosts',
-          'advanced_filters',
+          'join_events',
+          'verified_badge',
+          'free_video_calls',
           'premium_badge',
           'read_receipts',
           'priority_matches',
@@ -324,26 +326,46 @@ class _PremiumScreenState extends State<PremiumScreen> {
                             ),
                           ),
 
-                        // Premium features
+                        // Premium features - Updated with new features
                         _buildPremiumFeature(
                           icon: Icons.workspace_premium,
                           title: 'See Who Likes You',
                           description: 'Skip the guesswork',
                         ),
                         _buildPremiumFeature(
-                          icon: Icons.favorite_border,
-                          title: 'Unlimited Likes',
+                          icon: Icons.visibility,
+                          title: 'See Who Visited Your Profile',
+                          description: 'Know who\'s interested',
+                        ),
+                        _buildPremiumFeature(
+                          icon: Icons.all_inclusive,
+                          title: 'Unlimited Swipes',
                           description: 'No daily limits',
                         ),
                         _buildPremiumFeature(
-                          icon: Icons.star_border,
-                          title: '5 Free Super Likes per week',
-                          description: 'Stand out from the crowd',
-                        ),
-                        _buildPremiumFeature(
-                          icon: Icons.cancel_outlined,
+                          icon: Icons.undo,
                           title: 'Rewind',
                           description: 'Undo your last swipe',
+                        ),
+                        _buildPremiumFeature(
+                          icon: Icons.event,
+                          title: 'Join The Events',
+                          description: 'Exclusive premium events',
+                        ),
+                        _buildPremiumFeature(
+                          icon: Icons.verified,
+                          title: 'Verified Badge',
+                          description: 'Stand out with verification',
+                        ),
+                        _buildPremiumFeature(
+                          icon: Icons.video_call,
+                          title: '3 Free Video Calls',
+                          description: 'Connect face-to-face',
+                        ),
+                        _buildPremiumFeature(
+                          icon: Icons.star,
+                          title: '1 Super Like',
+                          description: 'Make a strong impression',
                         ),
 
                         // Promo Code Section

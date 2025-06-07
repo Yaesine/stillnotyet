@@ -15,6 +15,8 @@ import '../services/fake_video_call_service.dart';
 import '../widgets/components/letter_avatar.dart';
 import '../widgets/permission_handler_dialog.dart';
 import '../widgets/fake_video_player.dart';
+import '../services/block_service.dart';
+import '../widgets/user_profile_detail.dart';
 
 enum CallState {
   idle,
@@ -90,6 +92,15 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
   int _currentMessageIndex = 0;
   Timer? _messageTimer;
 
+  bool _isBlocked = false;
+
+  // Add new state variables
+  final TextEditingController _messageController = TextEditingController();
+  final List<CallMessage> _messages = [];
+  bool _showChat = false;
+  final ScrollController _chatScrollController = ScrollController();
+  StreamSubscription? _chatSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -129,6 +140,10 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
     if (_fakeCallSession != null) {
       _fakeVideoService.endFakeCallSession(_fakeCallSession!.sessionId);
     }
+
+    _messageController.dispose();
+    _chatScrollController.dispose();
+    _chatSubscription?.cancel();
 
     super.dispose();
   }
@@ -433,6 +448,7 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
 
       _slideController.forward();
       _startCall();
+      _initializeChat();
 
       _fakeCallTimer = Timer(session.fakeVideo.duration, () {
         if (_callState == CallState.fakeCall) {
@@ -479,6 +495,7 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
 
         _slideController.forward();
         _startCall();
+        _initializeChat();
       } else {
         setState(() => _callState = CallState.error);
       }
@@ -501,7 +518,7 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
 
   void _showParticipantInfoBriefly() {
     setState(() => _showParticipantInfo = true);
-    _infoTimer = Timer(const Duration(seconds: 3), () {
+    _infoTimer = Timer(const Duration(seconds: 7), () {
       if (mounted) {
         setState(() => _showParticipantInfo = false);
       }
@@ -518,6 +535,7 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
   }
 
   Future<void> _endCall() async {
+    _chatSubscription?.cancel();
     _searchTimer?.cancel();
     _callTimer?.cancel();
     _messageTimer?.cancel();
@@ -552,6 +570,7 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
       _fakeCallCameraEnabled = true;
       _fakeCallMicEnabled = true;
       _showParticipantInfo = false;
+      _messages.clear();
     });
   }
 
@@ -569,7 +588,26 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
   @override
   Widget build(BuildContext context) {
     if (widget.isFullScreen) {
-      return _buildFullscreenCall();
+      return WillPopScope(
+        onWillPop: () async {
+          if (_callState == CallState.connected || _callState == CallState.fakeCall) {
+            return await _showEndCallDialog();
+          }
+          return true;
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: Stack(
+            children: [
+              _buildMainContent(),
+              _buildTopOverlay(),
+              if (_showControls) _buildBottomControls(),
+              if (_showParticipantInfo) _buildParticipantInfo(),
+              _buildChatSection(),
+            ],
+          ),
+        ),
+      );
     }
 
     return _buildEmbeddedCall();
@@ -591,6 +629,7 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
             _buildTopOverlay(),
             if (_showControls) _buildBottomControls(),
             if (_showParticipantInfo) _buildParticipantInfo(),
+            _buildChatSection(),
           ],
         ),
       ),
@@ -609,6 +648,7 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
           if (_showControls) _buildBottomControls(),
           if (_showParticipantInfo) _buildParticipantInfo(),
           if (_callState != CallState.idle) _buildFullscreenButton(),
+          _buildChatSection(),
         ],
       ),
     );
@@ -1192,15 +1232,39 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
       children: [
         // Main video view
         Positioned.fill(
-          child: _agoraService.remoteUid != null
-              ? _agoraService.createRemoteVideoView(_agoraService.remoteUid!)
-              : _buildVideoPlaceholder(),
+          child: GestureDetector(
+            onTap: () {
+              if (_matchedUser != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileDetail(user: _matchedUser!),
+                  ),
+                );
+              }
+            },
+            child: _agoraService.remoteUid != null
+                ? _agoraService.createRemoteVideoView(_agoraService.remoteUid!)
+                : _buildVideoPlaceholder(),
+          ),
         ),
 
         // Video disabled overlay
         if (_agoraService.isVideoDisabled)
           Positioned.fill(
-            child: _buildVideoDisabledOverlay(),
+            child: GestureDetector(
+              onTap: () {
+                if (_matchedUser != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileDetail(user: _matchedUser!),
+                    ),
+                  );
+                }
+              },
+              child: _buildVideoDisabledOverlay(),
+            ),
           ),
 
         // Local video preview (Instagram-style)
@@ -1225,11 +1289,23 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            LetterAvatar(
-              name: _matchedUser!.name,
-              size: 120,
-              imageUrls: _matchedUser!.imageUrls,
-              showBorder: true,
+            GestureDetector(
+              onTap: () {
+                if (_matchedUser != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileDetail(user: _matchedUser!),
+                    ),
+                  );
+                }
+              },
+              child: LetterAvatar(
+                name: _matchedUser!.name,
+                size: 120,
+                imageUrls: _matchedUser!.imageUrls,
+                showBorder: true,
+              ),
             ),
             const SizedBox(height: 24),
             Text(
@@ -1255,38 +1331,48 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
   }
 
   Widget _buildVideoDisabledOverlay() {
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-      child: Container(
-        color: Colors.black.withOpacity(0.6),
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.videocam_off_rounded,
-                size: 80,
-                color: Colors.white70,
+    return Container(
+      color: Colors.black,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () {
+                if (_matchedUser != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileDetail(user: _matchedUser!),
+                    ),
+                  );
+                }
+              },
+              child: LetterAvatar(
+                name: _matchedUser!.name,
+                size: 120,
+                imageUrls: _matchedUser!.imageUrls,
+                showBorder: true,
               ),
-              SizedBox(height: 20),
-              Text(
-                'Your camera is off',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              '${_matchedUser!.name}\'s camera is off',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
               ),
-              SizedBox(height: 8),
-              Text(
-                'Tap the camera button to turn it on',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Tap their avatar to view profile',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 14,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1422,16 +1508,14 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
               children: [
                 _buildActionButton(
                   icon: Icons.refresh_rounded,
-                  label: 'Try Again',
                   onPressed: _startSearching,
-                  isPrimary: true,
+                  isEndCall: true,
                 ),
                 const SizedBox(width: 16),
                 _buildActionButton(
                   icon: Icons.home_rounded,
-                  label: 'Back',
                   onPressed: () => setState(() => _callState = CallState.idle),
-                  isPrimary: false,
+                  isEndCall: true,
                 ),
               ],
             ),
@@ -1497,16 +1581,14 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
               children: [
                 _buildActionButton(
                   icon: Icons.search_rounded,
-                  label: 'Find New',
                   onPressed: _startSearching,
-                  isPrimary: true,
+                  isEndCall: true,
                 ),
                 const SizedBox(width: 16),
                 _buildActionButton(
                   icon: Icons.home_rounded,
-                  label: 'Back',
                   onPressed: () => setState(() => _callState = CallState.idle),
-                  isPrimary: false,
+                  isEndCall: true,
                 ),
               ],
             ),
@@ -1518,44 +1600,54 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
 
   Widget _buildActionButton({
     required IconData icon,
-    required String label,
     required VoidCallback onPressed,
-    required bool isPrimary,
+    bool isEndCall = false,
+    bool isActive = false,
   }) {
     return GestureDetector(
-      onTap: onPressed,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onPressed();
+        _resetHideControlsTimer();
+      },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        width: 50,
+        height: 50,
         decoration: BoxDecoration(
-          gradient: isPrimary
+          shape: BoxShape.circle,
+          gradient: isEndCall
               ? LinearGradient(
-            colors: [AppColors.primary, AppColors.secondary],
+            colors: [Colors.red.shade600, Colors.red.shade800],
+          )
+              : isActive
+              ? LinearGradient(
+            colors: [
+              Colors.white.withOpacity(0.2),
+              Colors.white.withOpacity(0.1),
+            ],
           )
               : null,
-          color: isPrimary ? null : Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(25),
-          border: isPrimary
-              ? null
-              : Border.all(color: Colors.white.withOpacity(0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
+          color: isEndCall || isActive ? null : Colors.white.withOpacity(0.1),
+          border: Border.all(
+            color: isEndCall
+                ? Colors.red.shade400
+                : isActive
+                ? Colors.white.withOpacity(0.3)
+                : Colors.white.withOpacity(0.2),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
             ),
           ],
+        ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 24,
         ),
       ),
     );
@@ -1589,7 +1681,26 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
           children: [
             _buildBackButton(),
             _buildCallStatusBadge(),
-            _buildTopActionButton(),
+            if (_callState == CallState.connected || _callState == CallState.fakeCall)
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  _showOptionsMenu();
+                },
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withOpacity(0.5),
+                  ),
+                  child: const Icon(
+                    Icons.more_vert_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -1671,43 +1782,6 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
     );
   }
 
-  Widget _buildTopActionButton() {
-    if (_callState == CallState.searching) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.orange.withOpacity(0.5)),
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(
-              width: 12,
-              height: 12,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-              ),
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Searching',
-              style: TextStyle(
-                color: Colors.orange,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return const SizedBox(width: 40);
-  }
-
   Widget _buildBottomControls() {
     if (_callState != CallState.connected && _callState != CallState.fakeCall) {
       return const SizedBox.shrink();
@@ -1738,189 +1812,110 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            _buildControlButton(
+            _buildActionButton(
               icon: _isFakeCall
-                  ? (_fakeCallMicEnabled ? Icons.mic_rounded : Icons.mic_off_rounded)
-                  : (_agoraService.isMuted ? Icons.mic_off_rounded : Icons.mic_rounded),
+                  ? (_fakeCallMicEnabled ? Icons.mic : Icons.mic_off)
+                  : (_agoraService.isMuted ? Icons.mic_off : Icons.mic),
               onPressed: _isFakeCall ? _toggleFakeMic : _toggleMic,
               isActive: _isFakeCall ? _fakeCallMicEnabled : !_agoraService.isMuted,
             ),
-            _buildControlButton(
+            _buildActionButton(
               icon: _isFakeCall
-                  ? (_fakeCallCameraEnabled ? Icons.videocam_rounded : Icons.videocam_off_rounded)
-                  : (_agoraService.isVideoDisabled ? Icons.videocam_off_rounded : Icons.videocam_rounded),
+                  ? (_fakeCallCameraEnabled ? Icons.videocam : Icons.videocam_off)
+                  : (_agoraService.isVideoDisabled ? Icons.videocam_off : Icons.videocam),
               onPressed: _isFakeCall ? _toggleFakeCamera : _toggleCamera,
               isActive: _isFakeCall ? _fakeCallCameraEnabled : !_agoraService.isVideoDisabled,
             ),
-            _buildControlButton(
-              icon: Icons.call_end_rounded,
+            _buildActionButton(
+              icon: Icons.call_end,
               onPressed: _endCallWithConfirmation,
               isEndCall: true,
             ),
-            _buildControlButton(
-              icon: Icons.cameraswitch_rounded,
+            _buildActionButton(
+              icon: Icons.flip_camera_ios,
               onPressed: _switchCamera,
               isActive: true,
             ),
-            _buildControlButton(
-              icon: Icons.skip_next_rounded,
+            _buildActionButton(
+              icon: Icons.skip_next,
               onPressed: _skipToNext,
               isActive: true,
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildControlButton({
-    required IconData icon,
-    required VoidCallback onPressed,
-    bool isActive = true,
-    bool isEndCall = false,
-  }) {
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        onPressed();
-        _resetHideControlsTimer();
-      },
-      child: Container(
-        width: 64,
-        height: 64,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: isEndCall
-              ? LinearGradient(
-            colors: [Colors.red.shade600, Colors.red.shade800],
-          )
-              : isActive
-              ? LinearGradient(
-            colors: [
-              Colors.white.withOpacity(0.2),
-              Colors.white.withOpacity(0.1),
-            ],
-          )
-              : null,
-          color: isEndCall || isActive ? null : Colors.white.withOpacity(0.1),
-          border: Border.all(
-            color: isEndCall
-                ? Colors.red.shade400
-                : isActive
-                ? Colors.white.withOpacity(0.3)
-                : Colors.white.withOpacity(0.2),
-            width: 2,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+            _buildActionButton(
+              icon: Icons.chat_bubble_outline,
+              onPressed: () {
+                setState(() => _showChat = !_showChat);
+              },
+              isActive: _showChat,
             ),
           ],
-        ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 28,
         ),
       ),
     );
   }
 
   Widget _buildParticipantInfo() {
-    if (_matchedUser == null) return const SizedBox.shrink();
+    if (_matchedUser == null) return Container();
 
     return Positioned(
-      bottom: 160,
-      left: 16,
-      right: 16,
-      child: AnimatedBuilder(
-        animation: _fadeAnimation,
-        builder: (context, child) {
-          return Opacity(
-            opacity: _fadeAnimation.value,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.black.withOpacity(0.8),
-                    Colors.black.withOpacity(0.6),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.1),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  LetterAvatar(
-                    name: _matchedUser!.name,
-                    size: 50,
-                    imageUrls: _matchedUser!.imageUrls,
-                    showBorder: true,
+      top: MediaQuery.of(context).padding.top + 60,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileDetail(user: _matchedUser!),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${_matchedUser!.name}, ${_matchedUser!.age}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on_rounded,
-                              size: 16,
-                              color: Colors.white.withOpacity(0.7),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _matchedUser!.location,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.7),
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.3),
+                    width: 2,
                   ),
-                  if (_isFakeCall)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.orange.withOpacity(0.5),
-                        ),
-                      ),
-                      child: const Text(
-                        'DEMO',
-                        style: TextStyle(
-                          color: Colors.orange,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                ],
+                ),
+                child: LetterAvatar(
+                  name: _matchedUser!.name,
+                  size: 40,
+                  imageUrls: _matchedUser!.imageUrls,
+                  showBorder: true,
+                ),
               ),
             ),
-          );
-        },
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _matchedUser!.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  '${_matchedUser!.age} years old',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2020,4 +2015,486 @@ class _EnhancedAgoraCallScreenState extends State<EnhancedAgoraCallScreen>
       await _endCall();
     }
   }
+
+  void _showOptionsMenu() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 5,
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              if (_matchedUser != null) ...[
+                ListTile(
+                  leading: const Icon(Icons.block, color: Colors.red),
+                  title: const Text('Block User'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showBlockConfirmationDialog();
+                  },
+                ),
+                const Divider(),
+              ],
+              ListTile(
+                leading: const Icon(Icons.report, color: Colors.orange),
+                title: const Text('Report User'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _reportUser();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: const Text('View Profile'),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileDetail(user: _matchedUser!),
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.call_end, color: Colors.red),
+                title: const Text('End Call'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _endCall();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showBlockConfirmationDialog() {
+    if (_matchedUser == null) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.block, color: Colors.red, size: 28),
+              const SizedBox(width: 12),
+              Text('Block ${_matchedUser!.name}'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to block ${_matchedUser!.name}?',
+                style: const TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.red, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'This will end the call and prevent them from contacting you',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _blockUser();
+                _endCall();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              child: const Text('Block User'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _blockUser() async {
+    if (_matchedUser == null) return;
+
+    try {
+      final blockService = BlockService();
+      await blockService.blockUser(_matchedUser!);
+
+      if (mounted) {
+        setState(() {
+          _isBlocked = true;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${_matchedUser!.name} has been blocked'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error blocking user: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to block user. Please try again.'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    }
+  }
+
+  void _unblockUser() {
+    // Implementation of unblocking a user
+  }
+
+  void _reportUser() {
+    // Implementation of reporting a user
+  }
+
+  void _initializeChat() {
+    // Cancel any existing subscription
+    _chatSubscription?.cancel();
+
+    if (_currentRoomId == null) {
+      print('Cannot initialize chat: roomId is null');
+      return;
+    }
+
+    print('Initializing chat for room: $_currentRoomId');
+
+    // Only set up Firestore listener for real calls
+    if (!_isFakeCall) {
+      _chatSubscription = FirebaseFirestore.instance
+          .collection('calls')
+          .doc(_currentRoomId)
+          .collection('messages')
+          .orderBy('timestamp', descending: false)
+          .snapshots()
+          .listen((snapshot) {
+        if (!mounted) return;
+
+        final changes = snapshot.docChanges;
+        for (var change in changes) {
+          if (change.type == DocumentChangeType.added) {
+            final data = change.doc.data() as Map<String, dynamic>;
+            final message = CallMessage(
+              text: data['text'] as String,
+              senderId: data['senderId'] as String,
+              senderName: data['senderName'] as String,
+              timestamp: (data['timestamp'] as Timestamp).toDate(),
+            );
+
+            setState(() {
+              _messages.add(message);
+            });
+
+            // Scroll to bottom when new message arrives
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (_chatScrollController.hasClients) {
+                _chatScrollController.animateTo(
+                  _chatScrollController.position.maxScrollExtent,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeOut,
+                );
+              }
+            });
+          }
+        }
+      });
+    }
+  }
+
+  void _handleSendMessage(String text) async {
+    print('Attempting to send message: $text');
+    print('Current room ID: $_currentRoomId');
+    print('Is fake call: $_isFakeCall');
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      print('Cannot send message: user is null');
+      return;
+    }
+
+    setState(() {
+      _messageController.clear();
+    });
+
+    if (_isFakeCall) {
+      // For fake calls, just add the message locally
+      final message = CallMessage(
+        text: text,
+        senderId: currentUser.uid,
+        senderName: currentUser.displayName ?? 'You',
+        timestamp: DateTime.now(),
+      );
+
+      setState(() {
+        _messages.add(message);
+      });
+
+      // Scroll to bottom
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_chatScrollController.hasClients) {
+          _chatScrollController.animateTo(
+            _chatScrollController.position.maxScrollExtent,
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+      return;
+    }
+
+    // For real calls, send to Firestore
+    if (_currentRoomId == null) {
+      print('Cannot send message: roomId is null');
+      return;
+    }
+
+    final message = {
+      'text': text,
+      'senderId': currentUser.uid,
+      'senderName': currentUser.displayName ?? 'You',
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+
+    try {
+      print('Sending message to Firestore...');
+      await FirebaseFirestore.instance
+          .collection('calls')
+          .doc(_currentRoomId)
+          .collection('messages')
+          .add(message);
+      print('Message sent successfully');
+    } catch (e) {
+      print('Error sending message: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to send message. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Widget _buildChatSection() {
+    if (!_showChat) return const SizedBox.shrink();
+
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        height: 300,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.bottomCenter,
+            end: Alignment.topCenter,
+            colors: [
+              Colors.black.withOpacity(0.9),
+              Colors.black.withOpacity(0.7),
+              Colors.transparent,
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            // Chat header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Row(
+                children: [
+                  const Text(
+                    'Live Chat',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () {
+                      setState(() => _showChat = false);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            // Messages list
+            Expanded(
+              child: ListView.builder(
+                controller: _chatScrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                itemCount: _messages.length,
+                itemBuilder: (context, index) {
+                  final message = _messages[index];
+                  final isMe = message.senderId == FirebaseAuth.instance.currentUser?.uid;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      mainAxisAlignment: isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+                      children: [
+                        if (!isMe) ...[
+                          Text(
+                            message.senderName,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isMe ? AppColors.primary : Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            message.text,
+                            style: TextStyle(
+                              color: isMe ? Colors.white : Colors.white.withOpacity(0.9),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            // Message input
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(25),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white.withOpacity(0.1),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      ),
+                      onSubmitted: (text) {
+                        if (text.trim().isNotEmpty) {
+                          _handleSendMessage(text);
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: () {
+                      final text = _messageController.text.trim();
+                      if (text.isNotEmpty) {
+                        _handleSendMessage(text);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Icon(
+                        Icons.send_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class CallMessage {
+  final String text;
+  final String senderId;
+  final String senderName;
+  final DateTime timestamp;
+
+  CallMessage({
+    required this.text,
+    required this.senderId,
+    required this.senderName,
+    required this.timestamp,
+  });
 }

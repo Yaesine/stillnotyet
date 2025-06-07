@@ -13,6 +13,7 @@ import '../providers/user_provider.dart';
 import '../providers/app_auth_provider.dart';
 import 'dart:io' show Platform;
 
+import 'blocked_user_screen.dart';
 import 'cookie_policy_screen.dart';
 
 class PrivacySafetyScreen extends StatefulWidget {
@@ -1121,133 +1122,41 @@ class _PrivacySafetyScreenState extends State<PrivacySafetyScreen> {
 
             const SizedBox(height: 24),
 
-            // Blocking Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Blocked Users',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: textColor,
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(Icons.info_outline, color: subTextColor, size: 20),
-                  onPressed: () => _showPrivacyInfoDialog(
-                      'Blocked Users',
-                      'Blocked users cannot see your profile, send you messages, or interact with you in any way.'
-                  ),
-                ),
-              ],
+            // Blocked Users Section
+            Text(
+              'Blocked Users',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: textColor,
+              ),
             ),
             const SizedBox(height: 12),
-
-            // Blocked Users List
-            Container(
-              decoration: BoxDecoration(
-                color: cardColor,
+            Card(
+              shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    spreadRadius: 0,
-                  ),
-                ],
               ),
-              child: _blockedUsers.isEmpty
-                  ? Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.block,
-                        size: 48,
-                        color: subTextColor.withOpacity(0.5),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No blocked users',
-                        style: TextStyle(
-                          color: subTextColor,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Users you block will appear here',
-                        style: TextStyle(
-                          color: subTextColor.withOpacity(0.7),
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
+              child: ListTile(
+                leading: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.block,
+                    color: AppColors.primary,
                   ),
                 ),
-              )
-                  : ListView.separated(
-                physics: const NeverScrollableScrollPhysics(),
-                shrinkWrap: true,
-                itemCount: _blockedUsers.length,
-                separatorBuilder: (context, index) => Divider(
-                  color: dividerColor,
-                  height: 1,
-                ),
-                itemBuilder: (context, index) {
-                  final user = _blockedUsers[index];
-                  return ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: AppColors.primary.withOpacity(0.2),
-                      child: user['imageUrl'].isNotEmpty
-                          ? ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: Image.network(
-                          user['imageUrl'],
-                          width: 40,
-                          height: 40,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Text(
-                            user['name'][0],
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      )
-                          : Text(
-                        user['name'][0],
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    title: Text(
-                      user['name'],
-                      style: TextStyle(
-                        color: textColor,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    trailing: _isBlocking
-                        ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                      ),
-                    )
-                        : TextButton(
-                      onPressed: () => _unblockUser(user['id']),
-                      child: const Text('Unblock'),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.primary,
-                      ),
+                title: const Text('Manage Blocked Users'),
+                subtitle: const Text('View and unblock users you\'ve blocked'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BlockedUsersScreen(),
                     ),
                   );
                 },
